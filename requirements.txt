@@ -1,0 +1,24 @@
+# Entorno del agente - AgentSprint
+# Python 3.12  ·  instalar con:  .venv\Scripts\pip install -r requirements.txt
+
+# --- Modelo (SDK NUEVO de Gemini; NO usar google-generativeai, esta deprecado) ---
+google-genai
+
+# --- API + streaming al front ---
+fastapi
+uvicorn[standard]
+sse-starlette
+python-multipart
+
+# --- Config y validacion (esquemas de herramientas) ---
+pydantic
+pydantic-settings
+python-dotenv
+
+# --- Lectura del corpus ---
+pymupdf
+pillow
+
+# --- Utilidades ---
+httpx
+pytest

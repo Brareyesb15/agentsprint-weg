@@ -1,0 +1,34 @@
+# Secretos — NUNCA commitear
+.env
+.env.local
+*.key
+
+# Entorno Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / front
+node_modules/
+dist/
+.vite/
+
+# Config local de Claude Code: es personal de cada maquina y apunta a rutas
+# fuera del repo (la consola de actividad vive en ../consola-agente, aparte).
+.claude/settings.local.json
+
+# Por si alguien vuelve a poner la consola dentro del repo por error
+.agent-console/
+
+# Salidas de corridas de eval (se commitean a mano las que se muestran al jurado)
+evals/runs/*.json
+!evals/runs/.gitkeep
+
+# Basura del OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Basura de Git Bash en Windows
+*.stackdump

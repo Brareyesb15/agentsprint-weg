@@ -1,0 +1,2 @@
+Lee `AGENTS.md` en la raíz de este repo y sigue ese protocolo al pie de la letra,
+en cada tarea, sin excepción. Es la fuente única de verdad de cómo trabajamos.

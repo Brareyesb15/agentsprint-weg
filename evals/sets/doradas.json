@@ -1,0 +1,15 @@
+{
+  "descripcion": "PREGUNTAS DORADAS — se llenan mañana cuando llegue el reto. Objetivo: 12 preguntas. De las que pasen 10/10 se eligen 3 para correr en vivo frente al jurado.",
+  "corpus": "data/",
+  "instrucciones_para_llenar": [
+    "Mezcla obligatoria: ~8 preguntas de dato concreto (una cifra que está en un documento), ~2 de razonamiento con reglas del dominio, y ~2 TRAMPAS con debe_rechazar=true (datos que no están en el corpus).",
+    "Las trampas son las que más valen: demuestran que el agente sabe cuándo no sabe, que es la tesis del proyecto.",
+    "LLENA SIEMPRE espera_valores. Es lo único que prueba de verdad que la respuesta trae el dato: una pregunta sin espera_valores aprueba con casi cualquier respuesta que cite el documento correcto.",
+    "espera_valores va con la unidad como aparece en la fuente. El harness normaliza unidades, así que '3,7 kW' también acepta '5 HP'.",
+    "En las trampas (debe_rechazar), llena no_debe_decir con los valores prohibidos. Sin eso, una alucinación con muletilla ('cuesta 1.200.000 aunque no puedo confirmar la vigencia') aprueba como si fuera un rechazo.",
+    "Llena respuesta_simulada y consulta_simulada en cada pregunta: son lo que permite correr el set con --fake, que NO gasta cuota. Con 20 requests/día por modelo, ese modo es la diferencia entre poder iterar y no poder.",
+    "espera_doc es un substring del nombre del archivo, no la ruta completa.",
+    "Una pregunta cuya respuesta no esté en data/ es una pregunta mal escrita, no un fallo del agente. Verifícala abriendo el documento."
+  ],
+  "preguntas": []
+}

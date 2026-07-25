@@ -1,0 +1,48 @@
+{
+  "descripcion": "Set de juguete. Existe solo para probar que el armazón, el corpus y el guard funcionan sin depender del reto ni de una API key. NO se muestra al jurado.",
+  "corpus": "tests/fixtures/corpus_juguete/",
+  "preguntas": [
+    {
+      "id": "juguete-01",
+      "pregunta": "¿Con qué tensión se alimenta el ZX-100?",
+      "espera_doc": "ficha_ZX-100",
+      "espera_valores": ["24 V"],
+      "debe_rechazar": false,
+      "nota": "Caso feliz: el dato está literal en la sección 1.",
+      "consulta_simulada": "tensión alimentación ZX-100",
+      "respuesta_simulada": "El ZX-100 se alimenta con 24 V DC, según ficha_ZX-100.md, Sección 1 — Datos eléctricos."
+    },
+    {
+      "id": "juguete-02",
+      "pregunta": "¿Cuánto cuesta el ZX-100 en pesos colombianos?",
+      "espera_doc": null,
+      "espera_valores": [],
+      "debe_rechazar": true,
+      "no_debe_decir": ["1.200.000", "COP"],
+      "nota": "Trampa: en el corpus no hay precios. La respuesta correcta es rechazar. `no_debe_decir` evita que una alucinación con muletilla ('cuesta X, aunque no puedo confirmar la vigencia') apruebe como si fuera un rechazo.",
+      "consulta_simulada": "precio costo ZX-100 pesos",
+      "respuesta_simulada": "El precio no está en la documentación que tengo. Solo tengo datos técnicos del ZX-100."
+    },
+    {
+      "id": "juguete-03",
+      "pregunta": "¿El actuador compatible con el ZX-100 de cuántos HP es?",
+      "espera_doc": "ficha_ZX-100",
+      "espera_valores": ["3,7 kW"],
+      "debe_rechazar": false,
+      "nota": "Prueba la equivalencia de unidades: la fuente dice 3,7 kW y la respuesta dice 5 HP. El guard debe aceptarlo y el harness también.",
+      "consulta_simulada": "actuador recomendado potencia ZX-100",
+      "respuesta_simulada": "El actuador recomendado para el ZX-100 es de 5 HP, según ficha_ZX-100.md, Sección 3."
+    },
+    {
+      "id": "juguete-04",
+      "pregunta": "¿Con qué tensión se alimenta el ZX-100?",
+      "espera_doc": "ficha_ZX-100",
+      "espera_valores": ["24 V"],
+      "debe_rechazar": false,
+      "control_negativo": true,
+      "nota": "CONTROL NEGATIVO: la respuesta simulada dice 30 V, que NO está en la fuente. El guard debe bloquearla. Aprueba cuando falla.",
+      "consulta_simulada": "tensión alimentación ZX-100",
+      "respuesta_simulada": "El ZX-100 se alimenta con 30 V DC."
+    }
+  ]
+}
