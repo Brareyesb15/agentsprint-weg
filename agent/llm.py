@@ -247,6 +247,11 @@ def _parsear(bruto: Any) -> Respuesta:
                     LlamadaHerramienta(nombre=fc.name, args=dict(fc.args or {}))
                 )
                 continue
+            # Las partes con thought=True son el razonamiento del modelo, no la
+            # respuesta: concatenarlas filtraría el borrador SIN verificar al texto
+            # final. Se saltan.
+            if getattr(parte, "thought", False):
+                continue
             t = getattr(parte, "text", None)
             if t:
                 textos.append(t)

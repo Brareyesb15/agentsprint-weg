@@ -128,7 +128,7 @@ _RE_CODIGO = re.compile(r"^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9][A-Za-z0-9\-/_.]*$")
 # ---------------------------------------------------------------------------
 
 
-def normalizar_numero(texto: str) -> float | None:
+def normalizar_numero(texto: str, decimal_punto: bool = False) -> float | None:
     """Convierte un número escrito a float, resolviendo coma/punto decimal.
 
     Regla (documentada a propósito, porque es ambigua en la vida real):
@@ -158,7 +158,12 @@ def normalizar_numero(texto: str) -> float | None:
     elif tiene_coma:
         t = t.replace(",", "") if _es_miles(t, _RE_MILES_COMA) else t.replace(",", ".")
     elif tiene_punto:
-        if _es_miles(t, _RE_MILES_PUNTO):
+        # `decimal_punto` apaga la heurística de millares, y es imprescindible para la
+        # evidencia que produce una HERRAMIENTA: ahí los números son reprs de float de
+        # Python, donde el punto SIEMPRE es decimal. Sin esto, `{"potencia_kw": 7.457}`
+        # se leía como 7457 — el guard se equivocaba por un factor de mil justo en lo
+        # que existe para atrapar, y bloqueaba la respuesta correcta "7,457 kW".
+        if not decimal_punto and _es_miles(t, _RE_MILES_PUNTO):
             t = t.replace(".", "")
 
     try:
@@ -260,7 +265,7 @@ def _inicio_util(tokens: list[str]) -> int:
     return i
 
 
-def extraer_cantidades(texto: str) -> list[Cantidad]:
+def extraer_cantidades(texto: str, decimal_punto: bool = False) -> list[Cantidad]:
     """Saca las afirmaciones numéricas de un texto en prosa.
 
     Trabaja por tokens (no con un regex sobre la prosa) porque así los códigos de
@@ -274,11 +279,11 @@ def extraer_cantidades(texto: str) -> list[Cantidad]:
     """
     cantidades: list[Cantidad] = []
     for linea in texto.splitlines():
-        cantidades.extend(_cantidades_de_linea(linea))
+        cantidades.extend(_cantidades_de_linea(linea, decimal_punto))
     return cantidades
 
 
-def _cantidades_de_linea(linea: str) -> list[Cantidad]:
+def _cantidades_de_linea(linea: str, decimal_punto: bool = False) -> list[Cantidad]:
     cantidades: list[Cantidad] = []
     tokens = linea.split()
     inicio = _inicio_util(tokens)

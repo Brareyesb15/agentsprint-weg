@@ -97,3 +97,36 @@ def test_las_palabras_de_una_letra_siguen_sin_ser_unidades():
     for texto in ["Van de 3 a 5 metros.", "Hay 4 o 5 modelos.", "Trae 2 y 3 salidas."]:
         c = extraer_cantidades(texto)[0]
         assert c.familia is None, f"{texto} -> leyó unidad {c.unidad!r}"
+
+
+# --- el punto decimal de los floats de Python -------------------------------
+
+
+def test_el_float_de_una_herramienta_no_se_lee_como_millares():
+    """`{"potencia_kw": 7.457}` se leía como 7457: el guard se equivocaba por un
+    factor de MIL justo en lo que existe para atrapar, y bloqueaba la respuesta
+    correcta "7,457 kW". En un documento español "7.457" sí son millares, así que
+    la diferencia la hace el origen del número, no su forma."""
+    from agent.sources import normalizar_numero
+
+    assert normalizar_numero("7.457") == 7457.0, "en prosa española son millares"
+    assert normalizar_numero("7.457", decimal_punto=True) == 7.457
+
+
+def test_los_datos_de_la_placa_se_confirman():
+    """El caso que bloqueaba la demo: el agente repite lo que leyó en la foto y el
+    guard no tenía con qué respaldarlo."""
+    placa = Source(
+        doc="placa del motor (foto del usuario)",
+        snippet="10 HP, 4 polos, 1750 rpm, 220 V, 26,2 A, carcasa 132S",
+    )
+    res = verificar(
+        "El motor de la placa es de 7,457 kW (10 HP), 4 polos, 1750 rpm, 220 V y 26,2 A.",
+        [placa],
+        resultados_calculo=[
+            {"potencia_kw": 7.457, "polos": 4, "rpm": 1750.0,
+             "tension_v": 220.0, "corriente_a": 26.2}
+        ],
+    )
+    assert res.ok is True, res.detail
+    assert res.confirmed == res.checked

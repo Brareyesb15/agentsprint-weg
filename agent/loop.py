@@ -33,11 +33,13 @@ from agent.memory import SessionMemory
 from agent.sources import Source
 from agent.tools import Registro
 
-# Tres rondas. El número no es gusto: es el turno del ROI medido en vivo, que
-# necesita (1) eficiencia del motor nuevo en la tabla IE3, (2) eficiencia del viejo
-# en la tabla IE1, (3) calcular_ahorro. Con 2 rondas el agente se quedaba sin turnos
-# ANTES de llamar al cálculo y degradaba. Con 4 eran 61 s de demo; con 3 cabe justo.
-MAX_RONDAS = 3
+# Seis rondas de TOPE, no de costumbre: el loop corta solo cuando el modelo deja
+# de pedir herramientas, así que el caso típico usa 2-3. El tope alto existe por el
+# turno del ROI medido en vivo: buscar páginas IE1, leer su tabla, buscar IE3, leer
+# su tabla y RECIÉN entonces calcular_ahorro — con tope 4 el loop cortaba justo
+# antes del cálculo, el cierre no podía responder sin él, y salía vacío. Cada ronda
+# de Flash son ~2-3 s: el peor caso cabe en la demo.
+MAX_RONDAS = 6
 TOKENS_POR_EVENTO = 6
 
 
@@ -145,16 +147,34 @@ class Agente:
         herramientas_usadas: list[str] = []
         rondas = 0
 
+        forzar_proxima = False
         for ronda in range(self.max_rondas):
             if not declaraciones:
                 break
-            modo = llm.MODO_FORZAR if ronda == 0 else llm.MODO_LIBRE
+            modo = (
+                llm.MODO_FORZAR
+                if (ronda == 0 or forzar_proxima)
+                else llm.MODO_LIBRE
+            )
+            forzar_proxima = False
             resp = self.cliente.generar(
                 historial, sistema=sistema, declaraciones=declaraciones, modo=modo
             )
             rondas += 1
 
             if not resp.pidio_herramienta:
+                # Caso anómalo medido en vivo (turno del ROI): el modelo devuelve una
+                # parte SIN texto y SIN function_call — quiere hacer la cuenta él
+                # mismo y el prompt se lo prohíbe, así que emite un cascarón vacío.
+                # La cura: la siguiente ronda va en ANY, que lo obliga a usar una
+                # herramienta de verdad (calcular_ahorro es la única salida que tiene).
+                if not resp.texto and ronda + 1 < self.max_rondas:
+                    self.emitter.thought(
+                        "El modelo respondió vacío (quería calcular por su cuenta). "
+                        "Lo fuerzo a usar una herramienta."
+                    )
+                    forzar_proxima = True
+                    continue
                 # NO se emite el texto del modelo acá. Ese texto es la respuesta SIN
                 # verificar: si el modelo respondió de memoria con un número
                 # inventado, emitirlo lo pone en pantalla antes de que el guard lo
@@ -279,6 +299,14 @@ class Agente:
 
         if not res.hubo_consulta:
             aviso = prompts.REINTENTO_SIN_CONSULTA
+            modo = llm.MODO_FORZAR
+        elif "no produjo una respuesta" in res.detail:
+            # El cierre vino vacío: el modelo quería usar una herramienta (calcular,
+            # casi siempre) y el cierre no se lo permitía. El reintento se la fuerza.
+            aviso = (
+                "Tu respuesta llegó vacía. Si te falta un cálculo, llama a la "
+                "herramienta correspondiente AHORA; no intentes calcular tú."
+            )
             modo = llm.MODO_FORZAR
         else:
             aviso = prompts.reintento_sin_respaldo([f.texto for f in res.faltantes])

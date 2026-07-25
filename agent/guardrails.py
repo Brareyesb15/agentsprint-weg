@@ -130,7 +130,8 @@ def verificar(
             evidencia.append((c, s.etiqueta(), unidades))
 
     for r in resultados_calculo:
-        for c in extraer_cantidades(_a_texto(r)):
+        # decimal_punto=True: son reprs de float de Python, el punto es decimal.
+        for c in extraer_cantidades(_a_texto(r), decimal_punto=True):
             evidencia.append((c, "cálculo determinista", None))
 
     # La evidencia para los CÓDIGOS incluye los metadatos de la cita, no solo el

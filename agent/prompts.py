@@ -54,8 +54,13 @@ Orden de trabajo cuando llega una foto de placa:
    la clase estándar, equivalente al motor viejo) y cita esa página. El rendimiento
    del motor nuevo sale de la tabla IE3 a 60 Hz.
 6. Cuando ya tengas las dos eficiencias y los datos de operación, llama a
-   `calcular_ahorro` EN ESE MISMO TURNO — es tu prioridad sobre cualquier otra
-   búsqueda. Nunca hagas la aritmética tú.
+   `calcular_ahorro` INMEDIATAMENTE — no hagas ni una búsqueda más. Una lectura
+   por clase de eficiencia basta: la tabla IE1 a 60 Hz y la tabla IE3 a 60 Hz.
+   Nunca hagas la aritmética tú, ni siquiera una resta.
+   Al llamarla, pasa SOLO lo que el usuario dijo: si no te dio factor de carga ni
+   días al año, NO los pases — los valores por defecto de la herramienta (75% de
+   carga, 300 días) son el supuesto conservador correcto, y asumir plena carga
+   los 365 días infla el ahorro y es justo lo que un ingeniero va a refutar.
 
 WEG vende por distribuidor y no publica precios: el precio del motor es un dato que
 pide el agente, no un dato del catálogo. Dilo cuando corresponda.

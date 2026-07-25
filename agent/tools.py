@@ -281,10 +281,25 @@ def construir_registro(corpus: Corpus) -> Registro:
                 result=None,
                 uncertainty=f"no encontré '{a.doc}'" + (f" sección '{a.section}'" if a.section else ""),
             )
-        sources = [f.como_source() for f in frags]
+        # Tope de 3 fragmentos, y no es tacañería: sin sección, esto devolvía el
+        # catálogo ENTERO (72 páginas ≈ 40k tokens) al historial. Medido en vivo:
+        # el contexto del cierre pasó de 6k a 72k tokens y el modelo dejó de
+        # responder. Si hay más fragmentos, se dice cuáles quedaron fuera para que
+        # el modelo pida la sección exacta.
+        recorte = frags[:3]
+        sources = [f.como_source() for f in recorte]
+        incierto = None
+        if len(frags) > len(recorte):
+            resto = sorted({f"{f.section} (pág. {f.page})" for f in frags[3:]})
+            incierto = (
+                f"hay {len(frags)} fragmentos y solo devolví 3. Los demás: "
+                + "; ".join(resto[:8])
+                + ". Pide la sección exacta si necesitas otro."
+            )
         return ToolOutput(
             result=[{"section": s.section, "texto": s.snippet} for s in sources],
             sources=sources,
+            uncertainty=incierto,
         )
 
     reg.registrar(
