@@ -112,11 +112,27 @@ class BuscarMotorArgs(BaseModel):
     potencia_hp: float | None = Field(None, description="Potencia en HP")
     polos: int | None = Field(None, description="Número de polos: 2, 4, 6 u 8")
     frame: str | None = Field(None, description="Carcasa, si se conoce")
+    clase_eficiencia: str = Field(
+        "IE3",
+        description="Clase de eficiencia buscada: IE1, IE2, IE3 o IE4. Para un "
+        "reemplazo que ahorre energía, usa IE3.",
+    )
     extra: str = Field("", description="Cualquier otro término del catálogo a buscar")
 
 
+def _es_otra_frecuencia(seccion: str) -> bool:
+    """¿El título de esta página dice explícitamente una frecuencia que no es la nuestra?"""
+    s = seccion.lower().replace(" ", "")
+    nuestra = f"{motores.FRECUENCIA_HZ}hz"
+    return "hz" in s and nuestra not in s
+
+
 def _buscar_motor(a: BuscarMotorArgs, corpus: Corpus) -> ToolOutput:
-    partes = []
+    # La frecuencia va SIEMPRE, aunque el modelo no la pida. El catálogo trae las
+    # mismas potencias en tablas de 50 Hz y de 60 Hz, y sin este término la búsqueda
+    # las mezcla: en la primera prueba con la placa real ofreció un IE3 de 50 Hz,
+    # que en Colombia no aplica a ninguna placa.
+    partes = [f"{motores.FRECUENCIA_HZ} Hz", a.clase_eficiencia]
     if a.potencia_hp:
         partes.append(f"{a.potencia_hp:g} HP")
         partes.append(f"{motores.potencia_a_kw(a.potencia_hp, 'hp'):.2f} kW")
@@ -132,7 +148,15 @@ def _buscar_motor(a: BuscarMotorArgs, corpus: Corpus) -> ToolOutput:
     if not consulta:
         return ToolOutput(result=None, uncertainty="no me diste ningún criterio de búsqueda")
 
-    golpes = corpus.buscar(consulta, k=4)
+    # Filtro DURO de frecuencia, no un peso. El catálogo trae las mismas potencias
+    # en tablas de 50 Hz y de 60 Hz, y en Colombia la de 50 Hz no aplica a ninguna
+    # placa: no es "menos relevante", es incorrecta. Un peso blando no alcanzaba —
+    # medido: la tabla de 50 Hz le seguía ganando a la de 60 Hz.
+    golpes = [
+        (f, s)
+        for f, s in corpus.buscar(consulta, k=14)
+        if not _es_otra_frecuencia(f.section)
+    ][:4]
     if not golpes:
         return ToolOutput(
             result=[],

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente técnico WEG — plan B</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#262b36; --txt:#e6e8ee;
+          --dim:#8b93a5; --ok:#3ddc97; --bad:#ff5c5c; --acc:#5b9cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui,Segoe UI,sans-serif; background:var(--bg);
+         color:var(--txt); height:100vh; display:flex; flex-direction:column; }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex;
+           align-items:center; gap:12px; }
+  header b { font-size:15px; } header span { color:var(--dim); font-size:13px; }
+  #estado { margin-left:auto; font-size:12px; color:var(--dim); }
+  main { flex:1; display:flex; min-height:0; }
+  #chat { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  #trazas { width:340px; border-left:1px solid var(--line); background:var(--panel);
+            overflow-y:auto; padding:12px; font-size:12.5px; }
+  #trazas h3 { margin:0 0 8px; font-size:12px; color:var(--dim); text-transform:uppercase;
+               letter-spacing:.06em; font-weight:600; }
+  .msg { max-width:min(70ch,88%); padding:10px 14px; border-radius:12px; white-space:pre-wrap; }
+  .yo { align-self:flex-end; background:#243044; }
+  .bot { align-self:flex-start; background:var(--panel); border:1px solid var(--line); }
+  .cita { display:inline-block; margin:6px 6px 0 0; padding:3px 9px; border-radius:999px;
+          background:#1d2531; border:1px solid var(--line); color:var(--acc);
+          font-size:12px; cursor:pointer; }
+  .cita:hover { background:#243044; }
+  .frag { margin-top:6px; padding:8px 10px; background:#10141b; border-left:2px solid var(--acc);
+          border-radius:4px; font-size:12px; color:var(--dim); white-space:pre-wrap;
+          max-height:180px; overflow:auto; }
+  .verify { margin-top:8px; padding:8px 11px; border-radius:8px; font-size:13px; font-weight:600; }
+  .verify.ok { background:#123326; color:var(--ok); border:1px solid #1e5c44; }
+  .verify.bad { background:#3a1b1b; color:var(--bad); border:1px solid #6b2b2b; }
+  .t { padding:7px 9px; margin-bottom:6px; border-radius:6px; background:#10141b;
+       border-left:2px solid var(--line); }
+  .t .k { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .t.tool_call { border-left-color:#e8b84b; } .t.tool_result { border-left-color:var(--ok); }
+  .t.verify { border-left-color:var(--acc); } .t.error { border-left-color:var(--bad); }
+  .t .motivo { color:#e8b84b; font-style:italic; }
+  footer { border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:8px;
+           align-items:center; background:var(--panel); }
+  #q { flex:1; padding:11px 13px; border-radius:10px; border:1px solid var(--line);
+       background:var(--bg); color:var(--txt); font:inherit; }
+  button { padding:11px 18px; border-radius:10px; border:0; background:var(--acc);
+           color:#08111f; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  label.foto { padding:11px 13px; border:1px dashed var(--line); border-radius:10px;
+               color:var(--dim); cursor:pointer; font-size:13px; }
+  #prev { height:38px; border-radius:6px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <b>Asistente técnico WEG</b>
+  <span>distribuidor autorizado · respuestas con fuente</span>
+  <div id="estado">conectando…</div>
+</header>
+
+<main>
+  <div id="chat"></div>
+  <aside id="trazas"><h3>Qué está haciendo</h3><div id="tlist"></div></aside>
+</main>
+
+<footer>
+  <label class="foto">📷 Placa<input id="f" type="file" accept="image/*" hidden></label>
+  <img id="prev">
+  <input id="q" placeholder="¿Qué motor WEG reemplaza este? ¿Cuánto ahorro al año?" autofocus>
+  <button id="go">Enviar</button>
+</footer>
+
+<script>
+const chat = document.getElementById("chat"), tlist = document.getElementById("tlist");
+const q = document.getElementById("q"), go = document.getElementById("go");
+const f = document.getElementById("f"), prev = document.getElementById("prev");
+let imagen = null;
+
+fetch("/health").then(r => r.json()).then(h => {
+  document.getElementById("estado").textContent = h.ok
+    ? `${h.fragmentos} fragmentos · ${h.documentos.length} doc · ${h.modelo}`
+    : "sin corpus o sin API key: " + h.error;
+}).catch(() => document.getElementById("estado").textContent = "servidor caído");
+
+f.onchange = () => {
+  const file = f.files[0]; if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => { imagen = fr.result; prev.src = imagen; prev.style.display = "block"; };
+  fr.readAsDataURL(file);
+};
+
+function burbuja(clase, texto) {
+  const d = document.createElement("div");
+  d.className = "msg " + clase; d.textContent = texto || "";
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight; return d;
+}
+
+function traza(ev) {
+  const d = document.createElement("div"); d.className = "t " + ev.type;
+  const x = ev.data;
+  let cuerpo = "";
+  if (ev.type === "tool_call")
+    cuerpo = `<b>${x.tool}</b><div class="motivo">${x.motivo}</div>`;
+  else if (ev.type === "tool_result")
+    cuerpo = `<b>${x.tool}</b> · ${x.ok ? "ok" : "falló"} · ${x.ms} ms<div>${x.summary}</div>`;
+  else if (ev.type === "verify")
+    cuerpo = `<b>${x.ok ? "verificado" : "BLOQUEADA"}</b> ${x.confirmed}/${x.checked}<div>${x.detail}</div>`;
+  else if (ev.type === "memory") cuerpo = `<b>${x.key}</b> = ${x.value}`;
+  else if (ev.type === "error") cuerpo = `<b>${x.where}</b><div>${x.message}</div>`;
+  else cuerpo = x.text || "";
+  d.innerHTML = `<div class="k">${ev.type}</div>${cuerpo}`;
+  tlist.appendChild(d); tlist.scrollTop = tlist.scrollHeight;
+}
+
+async function preguntar() {
+  const texto = q.value.trim();
+  if (!texto || go.disabled) return;
+  burbuja("yo", texto + (imagen ? "  [+ foto de placa]" : ""));
+  q.value = ""; go.disabled = true; tlist.innerHTML = "";
+
+  const resp = burbuja("bot", "");
+  const cuerpo = document.createElement("div"); resp.appendChild(cuerpo);
+  let acumulado = "";
+
+  try {
+    const r = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: "demo", message: texto, image: imagen }),
+    });
+    imagen = null; f.value = ""; prev.style.display = "none";
+
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      // Un chunk puede traer medio evento: solo se procesan los completos.
+      const partes = buf.split("\n\n"); buf = partes.pop();
+      for (const p of partes) {
+        const linea = p.split("\n").find(l => l.startsWith("data: "));
+        if (!linea) continue;
+        const ev = JSON.parse(linea.slice(6)), x = ev.data;
+
+        if (ev.type === "token") {
+          acumulado += x.text; cuerpo.textContent = acumulado;
+        } else if (ev.type === "verify") {
+          const v = document.createElement("div");
+          v.className = "verify " + (x.ok ? "ok" : "bad");
+          v.textContent = (x.ok ? "✓ verificado " : "✕ bloqueada ")
+                        + `${x.confirmed}/${x.checked} — ${x.detail}`;
+          resp.appendChild(v); traza(ev);
+        } else if (ev.type === "citation") {
+          const c = document.createElement("span");
+          c.className = "cita";
+          c.textContent = `${x.doc}${x.page ? " · pág. " + x.page : ""}`;
+          const frag = document.createElement("div");
+          frag.className = "frag"; frag.textContent = x.snippet; frag.style.display = "none";
+          c.onclick = () => frag.style.display = frag.style.display === "none" ? "block" : "none";
+          resp.appendChild(c); resp.appendChild(frag); traza(ev);
+        } else {
+          traza(ev);
+        }
+        chat.scrollTop = chat.scrollHeight;
+      }
+    }
+    if (!acumulado) cuerpo.textContent = "(el agente no devolvió texto)";
+  } catch (e) {
+    cuerpo.textContent = "Falló la conexión con el servidor: " + e.message;
+  } finally {
+    go.disabled = false; q.focus();
+  }
+}
+
+go.onclick = preguntar;
+q.onkeydown = e => { if (e.key === "Enter") preguntar(); };
+</script>
+</body>
+</html>

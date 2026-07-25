@@ -33,7 +33,11 @@ from agent.memory import SessionMemory
 from agent.sources import Source
 from agent.tools import Registro
 
-MAX_RONDAS = 4
+# Dos rondas, no cuatro. Cada ronda es una llamada al modelo: con cuatro, un turno
+# tardó 61 s medidos contra el catálogo real, y una demo en vivo son 180 s en total.
+# Con dos, el agente busca, lee lo que necesita y cierra. Si de verdad necesita más
+# contexto, el reintento del guard le da otra oportunidad.
+MAX_RONDAS = 2
 TOKENS_POR_EVENTO = 6
 
 

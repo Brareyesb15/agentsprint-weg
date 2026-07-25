@@ -22,6 +22,23 @@ Córrelo **ahora**, y otra vez **antes de cada `git push`**. Nada más. No hay r
 - Commitea en cuanto algo funcione. No acumules una hora de trabajo sin subir: si se
   cae tu máquina, se cae la parte visual del proyecto entero.
 
+## Hay un PLAN B corriendo, y no te pisa
+
+En `plan_b/` hay un servidor + HTML mínimos que Brandon escribió como **seguro**
+contra llegar al pitch sin pantalla. Léelo así:
+
+- **Lo tuyo sigue siendo lo oficial.** `api/main.py` y `ui/index.html` son tus
+  archivos, nadie los tocó y nadie los va a tocar. Cuando funcionen, `plan_b/` se borra.
+- **Corre en el puerto 8010**, no en el 8000: puedes tener tu servidor arriba al
+  mismo tiempo sin conflicto.
+- **No construyas sobre `plan_b/`.** Úsalo como **referencia funcionando**: levántalo,
+  mira cómo conecta el agente al SSE, y roba lo que te sirva. Los detalles ya
+  resueltos ahí están listados en `plan_b/README.md`.
+
+```bash
+.venv\Scripts\python.exe -m uvicorn plan_b.servidor:app --port 8010
+```
+
 ## PRIORIDAD DE HOY — lee esto antes que nada
 
 **Solo el chat. Que funcione la cadena imagen → respuesta. Nada más.**
