@@ -238,7 +238,10 @@ def test_la_espera_total_es_corta():
     rot = Rotador(["k1", "k2"], max_intentos=6, dormir=dormidas.append)
     with pytest.raises(RuntimeError):
         rot.ejecutar(lambda _k: (_ for _ in ()).throw(ErrorDeCuota()))
-    assert sum(dormidas) < 15, f"antes eran ~45 s. Ahora {sum(dormidas):.1f} s"
+    # Cota con la cuenta hecha, no a ojo: espera_maxima=4 s y el jitter llega a 1,3x,
+    # con 4 esperas efectivas (6 intentos, 2 keys) -> techo 1,3*(2+4+4+4) = 18,2 s.
+    # Un límite de 15 s quedaba DENTRO del rango de jitter y el test parpadeaba.
+    assert sum(dormidas) < 19, f"antes eran ~45 s. Ahora {sum(dormidas):.1f} s"
 
 
 # --------------------------------------------------------------------------

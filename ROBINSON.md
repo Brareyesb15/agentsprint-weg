@@ -22,14 +22,32 @@ Córrelo **ahora**, y otra vez **antes de cada `git push`**. Nada más. No hay r
 - Commitea en cuanto algo funcione. No acumules una hora de trabajo sin subir: si se
   cae tu máquina, se cae la parte visual del proyecto entero.
 
+## PRIORIDAD DE HOY — lee esto antes que nada
+
+**Solo el chat. Que funcione la cadena imagen → respuesta. Nada más.**
+
+```
+[1] AHORA          subir foto + escribir pregunta + ver la respuesta en pantalla
+[2] DESPUÉS        panel de trazas
+[3] SI SOBRA       chips de cita clicables, modo presentación
+```
+
+Si a la hora tienes un chat feo que **sube una foto de una placa y devuelve la
+recomendación del motor**, ganamos. Si tienes un panel de trazas hermoso y el chat a
+medias, perdimos: el hito de Progreso se mide en "hay demo en vivo", y la demo es la
+foto entrando y la respuesta saliendo.
+
+**Traducción práctica:** de los 8 eventos, por ahora solo necesitas **`token`** (la
+respuesta) y **`error`**. Los otros seis pueden ir a `console.log()` hasta que el
+chat funcione. No maquetes lo que no se va a mostrar todavía.
+
 ## Qué construyes, en una frase
 
 Una pantalla donde el vendedor sube la **foto de una placa de motor**, escribe su
-pregunta, y ve **en vivo** cómo el agente busca en el catálogo de WEG, verifica cada
-cifra contra su fuente y responde con citas clicables.
+pregunta, y ve la recomendación del motor WEG equivalente.
 
-El panel de trazas **no es un extra**: es la evidencia del checklist técnico (20% de
-la nota) y es el espectáculo de la demo. Sin él, los segundos de espera son silencio.
+Más adelante, al lado, el panel que muestra cómo el agente lo verificó — pero eso es
+el paso [2], no el de ahora.
 
 ---
 
