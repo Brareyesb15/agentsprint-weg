@@ -84,8 +84,13 @@ def _titulo_de_pagina(texto: str, maximo: int = 70) -> str:
     """
     for linea in texto.splitlines():
         l = linea.strip()
-        if 3 <= len(l) <= maximo and any(c.isalpha() for c in l):
-            return l
+        if not (3 <= len(l) <= maximo) or not any(c.isalpha() for c in l):
+            continue
+        # El encabezado de cada página del catálogo de WEG es "www.weg.net". Citar
+        # "pág. 36, www.weg.net" se ve descuidado en pantalla y no dice nada.
+        if l.lower().startswith(("www.", "http")) or l.lower().endswith(".net"):
+            continue
+        return l
     return ""
 
 
@@ -267,4 +272,15 @@ class Corpus:
         if not candidatas:
             return frag.texto.strip()
         candidatas.sort(key=lambda c: c[0], reverse=True)
-        return "\n".join(l for _, l in candidatas[:maximo])
+        elegidas = [l for _, l in candidatas[:maximo]]
+
+        # Si las líneas elegidas no traen NINGÚN número pero la página sí, esto es una
+        # tabla: el PDF la extrae por columnas, así que las líneas que hacen match con
+        # la consulta son los encabezados ("Rendimiento", "HP", "Carcasa") y los
+        # valores viven en otras líneas. Devolver solo los encabezados es lo peor que
+        # puede pasar: el guard no encuentra las cifras en el snippet y BLOQUEA una
+        # respuesta correcta. En ese caso se devuelve la página entera.
+        hay_digitos = any(any(c.isdigit() for c in l) for l in elegidas)
+        if not hay_digitos and any(c.isdigit() for c in frag.texto):
+            return frag.texto.strip()
+        return "\n".join(elegidas)

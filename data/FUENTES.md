@@ -6,7 +6,29 @@ Regla: los documentos se descargan y se commitean. Nunca se depende de una URL e
 
 | Archivo | URL de origen | Fecha de descarga | Qué aporta | ¿Verificado a mano? |
 |---------|---------------|-------------------|------------|---------------------|
-| _(vacío — el corpus real se agrega el sábado)_ | | | | |
+| `WEG-WMO-w22-motor-electrico-trifasico-50024297-brochure-sp.pdf` | centro de descargas de WEG (doc. 50024297) | 2026-07-25 | **el corpus principal.** 72 páginas en español, línea W22 baja tensión, 60 Hz, IE3. Tablas de rendimiento por carcasa en las págs. 34–37 | sí, verificado con los 5 checks de abajo |
+
+### Cómo se verificó (repetible para cualquier catálogo nuevo)
+
+| Check | Resultado |
+|---|---|
+| Texto seleccionable (no escaneado) | ✅ 268.543 caracteres extraíbles |
+| **rpm de 60 Hz** (1750 / 1760 / 1765) | ✅ 65 apariciones · y 41 menciones de "60 Hz" |
+| Tabla de rendimiento | ✅ valores 88,0 / 89,1 / 90,3 / 91,5 junto a `132S`, pág. 34 |
+| Carcasas (`132S`, `132M`, `112M`, `160L`) | ✅ 358 |
+| Clase de eficiencia `IE3` / Premium | ✅ 53 |
+
+> ⚠️ **El check que descarta un catálogo al instante:** si solo aparecen rpm de
+> **1450 / 1470 / 1500**, es un catálogo **europeo de 50 Hz** y no sirve — ninguna
+> placa colombiana va a coincidir con esas velocidades, el agente no encuentra nada
+> y parece un bug del código cuando es el PDF.
+
+### Descartado
+
+`US100-Standard-Catalog-MV-Motors...pdf` — motores de **media tensión** (2,3–13,8 kV),
+alternadores y reductores, **en inglés**. No es el caso de uso (nuestro relato es un
+motor de 10 HP en baja tensión) y mientras estuvo en `data/` competía en la búsqueda
+y ensuciaba las citas. Quedó fuera del índice, en `data-descartado/` (no versionado).
 
 > ⚠ **Nada inventado dentro de `data/`.** Las fichas de juguete `ficha_ZX-100.md`
 > y `ficha_ZX-200.md` viven en `tests/fixtures/corpus_juguete/`, fuera de este

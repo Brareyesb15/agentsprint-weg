@@ -32,3 +32,6 @@ desktop.ini
 
 # Basura de Git Bash en Windows
 *.stackdump
+
+# Catalogos descartados: se conservan en disco, no en el repo
+data-descartado/
