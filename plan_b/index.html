@@ -3,71 +3,314 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Asistente técnico WEG — plan B</title>
+<title>Asistente técnico WEG</title>
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --line:#262b36; --txt:#e6e8ee;
-          --dim:#8b93a5; --ok:#3ddc97; --bad:#ff5c5c; --acc:#5b9cff; }
-  * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.5 system-ui,Segoe UI,sans-serif; background:var(--bg);
-         color:var(--txt); height:100vh; display:flex; flex-direction:column; }
-  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex;
-           align-items:center; gap:12px; }
-  header b { font-size:15px; } header span { color:var(--dim); font-size:13px; }
-  #estado { margin-left:auto; font-size:12px; color:var(--dim); }
-  main { flex:1; display:flex; min-height:0; }
-  #chat { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
-  #trazas { width:340px; border-left:1px solid var(--line); background:var(--panel);
-            overflow-y:auto; padding:12px; font-size:12.5px; }
-  #trazas h3 { margin:0 0 8px; font-size:12px; color:var(--dim); text-transform:uppercase;
-               letter-spacing:.06em; font-weight:600; }
-  .msg { max-width:min(70ch,88%); padding:10px 14px; border-radius:12px; white-space:pre-wrap; }
-  .yo { align-self:flex-end; background:#243044; }
-  .bot { align-self:flex-start; background:var(--panel); border:1px solid var(--line); }
-  .cita { display:inline-block; margin:6px 6px 0 0; padding:3px 9px; border-radius:999px;
-          background:#1d2531; border:1px solid var(--line); color:var(--acc);
-          font-size:12px; cursor:pointer; }
-  .cita:hover { background:#243044; }
-  .frag { margin-top:6px; padding:8px 10px; background:#10141b; border-left:2px solid var(--acc);
-          border-radius:4px; font-size:12px; color:var(--dim); white-space:pre-wrap;
-          max-height:180px; overflow:auto; }
-  .verify { margin-top:8px; padding:8px 11px; border-radius:8px; font-size:13px; font-weight:600; }
-  .verify.ok { background:#123326; color:var(--ok); border:1px solid #1e5c44; }
-  .verify.bad { background:#3a1b1b; color:var(--bad); border:1px solid #6b2b2b; }
-  .t { padding:7px 9px; margin-bottom:6px; border-radius:6px; background:#10141b;
-       border-left:2px solid var(--line); }
-  .t .k { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
-  .t.tool_call { border-left-color:#e8b84b; } .t.tool_result { border-left-color:var(--ok); }
-  .t.verify { border-left-color:var(--acc); } .t.error { border-left-color:var(--bad); }
-  .t .motivo { color:#e8b84b; font-style:italic; }
-  footer { border-top:1px solid var(--line); padding:10px 16px; display:flex; gap:8px;
-           align-items:center; background:var(--panel); }
-  #q { flex:1; padding:11px 13px; border-radius:10px; border:1px solid var(--line);
-       background:var(--bg); color:var(--txt); font:inherit; }
-  button { padding:11px 18px; border-radius:10px; border:0; background:var(--acc);
-           color:#08111f; font:inherit; font-weight:600; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:default; }
-  label.foto { padding:11px 13px; border:1px dashed var(--line); border-radius:10px;
-               color:var(--dim); cursor:pointer; font-size:13px; }
-  #prev { height:38px; border-radius:6px; display:none; }
+/* ============================================================
+   Piel de weg.net aplicada al plan B. Solo estilo: la lógica de
+   abajo (health, /chat, SSE, trazas) es la misma de siempre.
+   Paleta y medidas tomadas de ui/index.html, que replica
+   weg.net/institutional/CO/es/this-is-weg.
+   ============================================================ */
+:root{
+  --weg-azul:      #00569E;
+  --weg-cian:      #0090BE;
+  --weg-cian-claro:#63C1D5;
+  --gris-texto:    #58585A;
+  --gris-borde:    #CACACC;
+  --gris-sep:      #B1B1B3;
+  --barra-migas:   #EBEBED;
+  --fondo:         #F6F6F8;
+  --ok:            #1B7C36;
+  --bad:           #B02121;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Segoe UI",Roboto,-apple-system,Helvetica,Arial,sans-serif;
+  background:var(--fondo);
+  color:var(--gris-texto);
+  -webkit-font-smoothing:antialiased;
+}
+a{text-decoration:none;color:inherit}
+.container{width:1140px;max-width:calc(100% - 30px);margin:0 auto}
+
+/* ---------- cabecera ---------- */
+.weg-header{
+  height:82px;background:#fff;padding:0 15px;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  position:relative;z-index:5;
+}
+.hdr-izq{display:flex;align-items:flex-start;height:82px}
+.logo{margin-top:13px}
+.logo img{display:block;height:47px;width:auto}
+.mainnav{display:flex;align-items:center;height:20px;margin-top:27px}
+.mainnav a{
+  display:flex;align-items:center;gap:6px;
+  color:var(--weg-cian);font-size:15px;letter-spacing:.2px;line-height:20px;
+  padding:0 12px;white-space:nowrap;
+}
+.mainnav a:hover{color:var(--weg-azul)}
+.mainnav .sep{width:1px;height:15px;background:var(--gris-sep)}
+.chev{display:block;width:9px;height:6px;flex:none}
+
+.hdr-der{display:flex;flex-direction:column;align-items:flex-end;padding-top:3px}
+.toplinks{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--weg-cian)}
+.toplinks .sep{width:1px;height:12px;background:var(--gris-sep)}
+.toplinks a{display:flex;align-items:center;gap:4px}
+.toplinks a:hover{color:var(--weg-azul)}
+.bandera{width:22px;height:14px;display:block;
+  background:linear-gradient(#FFD100 0 50%,#003893 50% 75%,#CE1126 75% 100%)}
+.buscador{
+  margin-top:12px;width:357px;height:29px;background:#fff;
+  border:1px solid var(--gris-borde);display:flex;align-items:center;
+  padding:0 8px 0 12px;
+}
+.buscador input{
+  flex:1;border:0;outline:0;font:13px inherit;color:var(--gris-texto);background:transparent;
+}
+.buscador input::placeholder{color:#98989A}
+.buscador button{border:0;background:transparent;cursor:pointer;padding:0 2px;
+  color:var(--weg-azul);display:flex;align-items:center}
+
+/* ---------- hero ---------- */
+.hero{
+  height:175px;
+  background:url("assets/hero-weg.jpg") center center / cover no-repeat;
+  display:flex;align-items:flex-start;
+}
+.hero .container{padding-top:47px}
+.hero h1{margin:0;color:#fff;font-size:39px;font-weight:300;letter-spacing:1px;line-height:1}
+.hero .rayita{display:block;width:48px;height:2px;background:#fff;margin-top:32px}
+
+/* ---------- migas de pan ---------- */
+.migas{background:var(--barra-migas);border-bottom:1px solid #E1E1E3;height:35px;
+  display:flex;align-items:center;font-size:12px}
+.migas a{color:var(--weg-cian)}
+.migas a:hover{text-decoration:underline}
+.migas .div{margin:0 10px;color:#B4B4B6;font-size:10px}
+.migas .actual{color:#98989A}
+
+/* ---------- contenido ---------- */
+.contenido{padding:48px 0 64px}
+.contenido h2{margin:0;color:var(--weg-azul);font-size:39px;font-weight:300;line-height:1.15}
+.contenido .rayita{display:block;width:48px;height:2px;background:var(--weg-cian-claro);margin:23px 0 0}
+.lead{font-style:italic;font-size:16.5px;line-height:1.6;margin:20px 0 0}
+
+/* ============================================================
+   Panel del asistente
+   ============================================================ */
+.panel{
+  margin-top:30px;background:#fff;border:1px solid #D8D8DA;
+  box-shadow:0 10px 30px rgba(0,40,80,.08);
+  display:flex;flex-direction:column;height:min(620px,calc(100vh - 160px));overflow:hidden;
+}
+.panel-barra{
+  background:var(--weg-azul);color:#fff;padding:12px 16px;
+  display:flex;align-items:center;gap:12px;flex:none;
+}
+.panel-barra .logo-min{height:22px;width:auto;display:block;filter:brightness(0) invert(1)}
+.panel-barra .marca{display:flex;flex-direction:column;line-height:1.25;flex:1;min-width:0}
+.panel-barra .marca b{font-size:14px;font-weight:600;letter-spacing:.2px}
+.panel-barra .marca span{font-size:11.5px;opacity:.82}
+#estado{
+  font-size:11.5px;color:#fff;background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.35);padding:5px 11px;white-space:nowrap;
+}
+
+main{flex:1;display:flex;min-height:0}
+#chat{flex:1 1 56%;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;
+  gap:12px;min-width:0;border-right:1px solid #E4E4E6}
+#trazas{flex:1 1 44%;overflow-y:auto;padding:14px;background:#FAFAFC;min-width:0}
+#trazas h3{
+  margin:0 0 10px;font-size:11px;color:#8A8A8C;text-transform:uppercase;
+  letter-spacing:1.2px;font-weight:600;
+}
+
+/* --- burbujas --- */
+.msg{max-width:min(70ch,88%);padding:11px 14px;white-space:pre-wrap;font-size:14px;
+  line-height:1.55;word-wrap:break-word}
+.yo{align-self:flex-end;background:var(--weg-azul);color:#fff}
+.bot{align-self:flex-start;background:#F1F4F7;color:#333;border-left:3px solid var(--weg-cian)}
+.cita{
+  display:inline-block;margin:6px 6px 0 0;padding:4px 9px;
+  background:#fff;border:1px solid var(--weg-cian);color:var(--weg-azul);
+  font-size:11.5px;cursor:pointer;
+}
+.cita:hover{background:#EAF6FA}
+.frag{
+  margin-top:6px;padding:10px 12px;background:#FFFDF2;border:1px solid #E8DFB8;
+  border-left:3px solid #D9C566;font-size:12.5px;line-height:1.5;color:#5A5230;
+  white-space:pre-wrap;max-height:180px;overflow:auto;
+}
+.verify{margin-top:8px;padding:9px 12px;font-size:13px;font-weight:600}
+.verify.ok{background:#E7F6EC;color:var(--ok);border:1px solid #BCE5C9}
+.verify.bad{background:#FDECEC;color:var(--bad);border:1px solid #F3C4C4}
+
+/* --- trazas --- */
+.t{padding:9px 11px;margin-bottom:8px;background:#fff;border:1px solid #E6E6E8;
+  border-left:3px solid #E6E6E8;font-size:12.5px;line-height:1.45}
+.t .k{color:#9A9A9C;font-size:9.5px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.t b{color:var(--weg-azul);font-weight:600}
+.t.tool_call{border-left-color:var(--weg-cian)}
+.t.tool_result{border-left-color:var(--ok)}
+.t.verify{border-left-color:var(--weg-azul);background:#F7FAFD}
+.t.citation{border-left-color:#D9C566;background:#FFFDF2}
+.t.memory{border-left-color:#7A4FBF;background:#F7F3FD}
+.t.error{border-left-color:var(--bad);background:#FEF4F4;color:#8E2020}
+.t.thought{background:#FAFAFA;color:#8A8A8C;font-style:italic}
+.t .motivo{color:#3C3C3E;margin-top:5px;font-style:italic}
+
+/* --- barra de escritura --- */
+footer.escribir{
+  border-top:1px solid #E4E4E6;padding:11px 14px;display:flex;gap:9px;
+  align-items:center;background:#fff;flex:none;
+}
+#q{
+  flex:1;padding:10px 12px;border:1px solid var(--gris-borde);
+  background:#fff;color:var(--gris-texto);font:14px inherit;outline:0;
+}
+#q:focus{border-color:var(--weg-cian)}
+button{
+  padding:10px 22px;border:0;background:var(--weg-azul);color:#fff;
+  font:14px inherit;letter-spacing:.2px;cursor:pointer;
+}
+button:hover{background:#00437C}
+button:disabled{background:#A8B8C6;cursor:default}
+label.foto{
+  padding:10px 13px;border:1px solid var(--gris-borde);background:#fff;
+  color:var(--weg-azul);cursor:pointer;font-size:13px;white-space:nowrap;
+}
+label.foto:hover{border-color:var(--weg-cian);background:#F2F9FC}
+#prev{height:38px;border:1px solid var(--gris-borde);display:none}
+
+/* ---------- pie ---------- */
+.weg-footer{background:var(--weg-azul);color:#fff;padding:22px 0;margin-top:56px}
+.weg-footer .container{display:flex;align-items:center;gap:16px;font-size:12px}
+.weg-footer .container span{opacity:.8}
+.weg-footer .container .der{margin-left:auto;opacity:.7}
+
+@media (max-width:900px){
+  .hdr-der,.mainnav{display:none}
+  main{flex-direction:column}
+  #chat{border-right:0;border-bottom:1px solid #E4E4E6}
+  .panel{height:auto}
+  #chat,#trazas{height:320px;flex:none}
+}
 </style>
 </head>
 <body>
-<header>
-  <b>Asistente técnico WEG</b>
-  <span>distribuidor autorizado · respuestas con fuente</span>
-  <div id="estado">conectando…</div>
+
+<!-- ===================== CABECERA ===================== -->
+<header class="weg-header">
+  <div class="hdr-izq">
+    <a href="#" class="logo"><img src="assets/weg-logo.png" alt="WEG"></a>
+    <nav class="mainnav">
+      <a href="#">SOBRE WEG <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg></a>
+      <i class="sep"></i>
+      <a href="#">PRODUCTOS <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg></a>
+      <i class="sep"></i>
+      <a href="#">SOLUCIONES <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg></a>
+      <i class="sep"></i>
+      <a href="#">INVERSIONISTAS <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg></a>
+      <i class="sep"></i>
+      <a href="#">ÉTICA <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg></a>
+      <i class="sep"></i>
+      <a href="#">CONTÁCTENOS <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg></a>
+    </nav>
+  </div>
+
+  <div class="hdr-der">
+    <div class="toplinks">
+      <a href="#">Noticias</a>
+      <i class="sep"></i>
+      <a href="#">Formación</a>
+      <i class="sep"></i>
+      <a href="#">Trabajo</a>
+      <i class="sep"></i>
+      <a href="#" aria-label="Comparar">
+        <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
+          <path d="M0 3h12M9 .5 12.5 3 9 5.5M15 8H3M6 5.5 2.5 8 6 10.5" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </a>
+      <i class="sep"></i>
+      <a href="#">
+        <svg width="10" height="12" viewBox="0 0 10 12" fill="none">
+          <rect x=".6" y="5" width="8.8" height="6.4" stroke="currentColor" stroke-width="1.1"/>
+          <path d="M2.6 5V3.2a2.4 2.4 0 0 1 4.8 0V5" stroke="currentColor" stroke-width="1.1"/>
+        </svg>
+        Iniciar sesión
+      </a>
+      <i class="sep"></i>
+      <a href="#"><i class="bandera"></i>
+        <svg class="chev" viewBox="0 0 10 6" fill="none"><path d="M1 1.2 5 4.8 9 1.2" stroke="currentColor" stroke-width="1.3"/></svg>
+      </a>
+    </div>
+
+    <form class="buscador" onsubmit="return false">
+      <input type="text" placeholder="Búsqueda por producto, categoría o código">
+      <button type="submit" aria-label="Buscar">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+          <circle cx="7" cy="7" r="5.4" stroke="currentColor" stroke-width="1.9"/>
+          <path d="M11.2 11.2 16 16" stroke="currentColor" stroke-width="1.9"/>
+        </svg>
+      </button>
+    </form>
+  </div>
 </header>
 
-<main>
-  <div id="chat"></div>
-  <aside id="trazas"><h3>Qué está haciendo</h3><div id="tlist"></div></aside>
-</main>
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="container">
+    <h1>ASISTENTE TÉCNICO</h1>
+    <i class="rayita"></i>
+  </div>
+</section>
 
-<footer>
-  <label class="foto">📷 Placa<input id="f" type="file" accept="image/*" hidden></label>
-  <img id="prev">
-  <input id="q" placeholder="¿Qué motor WEG reemplaza este? ¿Cuánto ahorro al año?" autofocus>
-  <button id="go">Enviar</button>
+<!-- ===================== MIGAS ===================== -->
+<div class="migas">
+  <div class="container">
+    <a href="#">Página principal</a><span class="div">&#9656;</span><a href="#">Soporte</a><span class="div">&#9656;</span><span class="actual">Asistente técnico</span>
+  </div>
+</div>
+
+<!-- ===================== CONTENIDO ===================== -->
+<div class="contenido">
+  <div class="container">
+    <h2>Consulta técnica verificada</h2>
+    <i class="rayita"></i>
+    <p class="lead">Responde solo con la documentación oficial: cada cifra sale con su documento y su página./</p>
+
+    <section class="panel">
+      <div class="panel-barra">
+        <img class="logo-min" src="assets/weg-logo.png" alt="">
+        <div class="marca">
+          <b>Asistente técnico WEG</b>
+          <span>distribuidor autorizado &middot; respuestas con fuente</span>
+        </div>
+        <div id="estado">conectando…</div>
+      </div>
+
+      <main>
+        <div id="chat"></div>
+        <aside id="trazas"><h3>Qué está haciendo</h3><div id="tlist"></div></aside>
+      </main>
+
+      <footer class="escribir">
+        <label class="foto">📷 Placa<input id="f" type="file" accept="image/*" hidden></label>
+        <img id="prev">
+        <input id="q" placeholder="¿Qué motor WEG reemplaza este? ¿Cuánto ahorro al año?" autofocus>
+        <button id="go">Enviar</button>
+      </footer>
+    </section>
+  </div>
+</div>
+
+<!-- ===================== PIE ===================== -->
+<footer class="weg-footer">
+  <div class="container">
+    <span>WEG &middot; Motores | Automatización | Energía | Transmisión &amp; Distribución | Pinturas</span>
+    <span class="der">Demo interna</span>
+  </div>
 </footer>
 
 <script>
