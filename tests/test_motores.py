@@ -198,3 +198,42 @@ def test_calcular_ahorro_devuelve_claves_con_unidad():
     assert "ahorro_kwh_ano" in salida.result
     assert "payback_meses" in salida.result
     assert mem.obtener("tarifa_kwh") == 800
+
+
+def test_con_precio_el_calculo_no_sale_marcado_incierto():
+    """Iba con `uncertainty` puesta aunque el cálculo fuera perfecto, y el agente
+    abría la respuesta disculpándose por el precio en vez de dar el payback."""
+    reg, _, _ = _registro()
+    salida, _ = reg.ejecutar("calcular_ahorro", {
+        "potencia_kw": 7.457, "eficiencia_vieja": 0.875, "eficiencia_nueva": 0.92,
+        "horas_dia": 16, "tarifa_kwh": 850, "precio_motor": 3_200_000, "motivo": "roi",
+    })
+    assert salida.uncertainty is None
+    assert salida.result["payback_meses"] == 30.1
+    assert "distribuidor" in salida.result["nota_precio"]
+
+
+def test_sin_precio_si_avisa_que_falta():
+    reg, _, _ = _registro()
+    salida, _ = reg.ejecutar("calcular_ahorro", {
+        "potencia_kw": 7.457, "eficiencia_vieja": 0.875, "eficiencia_nueva": 0.92,
+        "horas_dia": 16, "tarifa_kwh": 850, "motivo": "roi",
+    })
+    assert salida.uncertainty is not None and "Pídelo" in salida.uncertainty
+    assert salida.result["payback_meses"] is None
+
+
+def test_las_cifras_del_roi_de_la_demo_son_las_verificadas_a_mano():
+    """Números del arco de la demo, calculados a mano contra el catálogo:
+    IE1 87,5% (pág. 57) -> IE3 92,0% (pág. 50), 16 h/día, 300 días, $850/kWh."""
+    r = motores.calcular_ahorro(
+        potencia_kw=7.457, eficiencia_vieja=0.875, eficiencia_nueva=0.92,
+        horas_dia=16, dias_ano=300, tarifa_kwh=850, carga=0.75,
+        precio_motor=3_200_000,
+    )
+    d = r.como_dict()
+    assert d["consumo_viejo_kwh_ano"] == 30680.2
+    assert d["consumo_nuevo_kwh_ano"] == 29179.6
+    assert d["ahorro_kwh_ano"] == 1500.7
+    assert d["payback_meses"] == 30.1
+    assert d["co2_evitado_ton_ano"] == 0.91

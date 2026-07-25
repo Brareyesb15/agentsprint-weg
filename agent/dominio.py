@@ -212,15 +212,24 @@ def _calcular_ahorro(a: AhorroArgs, memoria: SessionMemory) -> ToolOutput:
     memoria.guardar("tarifa_kwh", a.tarifa_kwh, origen="calcular_ahorro")
     memoria.guardar("horas_dia", a.horas_dia, origen="calcular_ahorro")
 
+    resultado = r.como_dict()
+    # La procedencia del precio va en el RESULTADO, no en `uncertainty`. Antes iba
+    # como incertidumbre y el turno salía marcado INCIERTO aunque el cálculo fuera
+    # perfecto: el agente abría la respuesta disculpándose por el precio en vez de
+    # decir "sí vale la pena, se paga en 30 meses". `uncertainty` queda para cuando
+    # de verdad falta algo.
+    if a.precio_motor:
+        resultado["nota_precio"] = (
+            "el payback usa el precio que ingresó el usuario; WEG vende por "
+            "distribuidor y no publica precios en el catálogo"
+        )
     return ToolOutput(
-        result=r.como_dict(),
+        result=resultado,
         sources=[],
         uncertainty=(
-            "El ahorro sale de las dos eficiencias y de los datos de operación que "
-            "diste; el precio del motor no está en el catálogo de WEG (venden por "
-            "distribuidor), así que el payback usa el precio que ingresaste."
+            None
             if a.precio_motor
-            else "Sin precio del motor no puedo darte el payback, solo el ahorro."
+            else "Sin precio del motor solo puedo dar el ahorro, no el payback. Pídelo."
         ),
     )
 
