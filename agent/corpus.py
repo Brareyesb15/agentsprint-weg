@@ -40,6 +40,41 @@ def tokenizar(texto: str) -> list[str]:
     ]
 
 
+_RE_DECIMAL_ROTO = re.compile(r"(?<=\d)([.,])[ \t]+(?=\d)")
+_RE_MARCADOR_INICIAL = re.compile(r"^(\s*\d{1,3}[.)]\s)")
+
+
+def reparar_decimales(texto: str) -> str:
+    """Reune los decimales que el PDF parte en dos: "11. 4" -> "11.4".
+
+    Verificado en el catálogo real de WEG: las tablas de datos eléctricos salen con
+    el separador decimal en su propio span de texto, así que `get_text()` devuelve
+    "11. 4" en vez de "11.4" — y pasa en TODOS los modos de extracción de pymupdf
+    (text, blocks y sort), o sea que es el PDF, no la librería.
+
+    Por qué importa tanto: sin esto, la evidencia contiene 11 y 4 como dos números
+    distintos. Si la respuesta dice "11,4 A" el guard no encuentra respaldo y
+    BLOQUEA una respuesta correcta. Un catálogo mal extraído no da respuestas
+    malas: da un agente que se niega a responder.
+
+    Se respeta el marcador de lista al inicio de renglón ("1. 4 pasos" no se
+    convierte en "1.4 pasos").
+    """
+    salida = []
+    for linea in texto.splitlines():
+        m = _RE_MARCADOR_INICIAL.match(linea)
+        resto = linea[m.end() :] if m else ""
+        # "11. 4" y "1. Conecta el sensor" son idénticos para un regex de marcador.
+        # Los separa lo que viene DESPUÉS: un paso de lista lleva palabras, un
+        # decimal partido lleva solo cifras.
+        es_marcador = bool(m) and bool(re.search(r"[^\W\d_]", resto))
+        if es_marcador:
+            salida.append(m.group(1) + _RE_DECIMAL_ROTO.sub(r"\1", resto))
+        else:
+            salida.append(_RE_DECIMAL_ROTO.sub(r"\1", linea))
+    return "\n".join(salida)
+
+
 def _titulo_de_pagina(texto: str, maximo: int = 70) -> str:
     """Heurística de encabezado: la primera línea corta y con letras de la página.
 
@@ -139,7 +174,7 @@ class Corpus:
         try:
             with fitz.open(archivo) as doc:
                 for n, pagina in enumerate(doc, start=1):
-                    texto = (pagina.get_text() or "").strip()
+                    texto = reparar_decimales((pagina.get_text() or "").strip())
                     if len(texto) < 20:
                         sin_texto += 1
                         continue

@@ -31,6 +31,7 @@ from agent.sources import (
     coincide,
     extraer_cantidades,
     extraer_codigos,
+    unidades_mencionadas,
 )
 
 TOLERANCIA_POR_DEFECTO = 0.02  # 2%: cubre el redondeo de catálogo (3,7 kW vs 5 HP)
@@ -119,14 +120,18 @@ def verificar(
     # Cada pieza de evidencia sabe si vino de una fuente citada o de un cálculo.
     # La diferencia importa: los números de un cálculo llegan sin unidad y hay que
     # dejarlos respaldar afirmaciones con unidad; los de una fuente, no.
-    evidencia: list[tuple[Cantidad, str, bool]] = []
+    # El tercer elemento dice si esa evidencia puede respaldar una afirmación CON
+    # unidad usando un número pelado. Es cierto para los cálculos (devuelven cifras
+    # sin unidad) y para los números de una tabla cuya columna nombra la unidad.
+    evidencia: list[tuple[Cantidad, str, set[str] | None]] = []
     for s in sources:
+        unidades = unidades_mencionadas(s.snippet)
         for c in extraer_cantidades(s.snippet):
-            evidencia.append((c, s.etiqueta(), False))
+            evidencia.append((c, s.etiqueta(), unidades))
 
     for r in resultados_calculo:
         for c in extraer_cantidades(_a_texto(r)):
-            evidencia.append((c, "cálculo determinista", True))
+            evidencia.append((c, "cálculo determinista", None))
 
     # La evidencia para los CÓDIGOS incluye los metadatos de la cita, no solo el
     # snippet: cuando la respuesta escribe "según ficha_ZX-100.md, Sección 1", ese
@@ -143,8 +148,11 @@ def verificar(
 
     for a in afirmaciones:
         hallazgo = None
-        for b, origen, es_calculo in evidencia:
-            modo = coincide(a, b, tolerancia, permitir_sin_unidad=es_calculo)
+        for b, origen, unidades in evidencia:
+            # None = viene de un cálculo: sus números nunca traen unidad.
+            # set  = viene de una fuente: solo si la fuente nombra esa unidad.
+            permitir = unidades is None or (a.unidad is not None and a.unidad in unidades)
+            modo = coincide(a, b, tolerancia, permitir_sin_unidad=permitir)
             if modo is not None:
                 hallazgo = (a, origen, modo)
                 break

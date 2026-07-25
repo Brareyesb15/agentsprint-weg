@@ -350,6 +350,48 @@ def extraer_codigos(texto: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+# Cómo se nombra cada unidad en prosa, además de su símbolo. Sirve para leer el
+# encabezado de una columna: "Full Load Amps" dice que la columna son amperios.
+_PALABRAS_DE_UNIDAD: dict[str, str] = {
+    "amp": "a", "amps": "a", "ampere": "a", "amperes": "a", "amperio": "a", "amperios": "a",
+    "volt": "v", "volts": "v", "voltio": "v", "voltios": "v", "tension": "v", "tensión": "v",
+    "watt": "w", "watts": "w", "vatio": "w", "vatios": "w",
+    "kilowatt": "kw", "kilowatts": "kw", "kilovatio": "kw", "kilovatios": "kw",
+    "hp": "hp", "horsepower": "hp", "caballos": "hp",
+    "hertz": "hz", "hercio": "hz", "hercios": "hz",
+    "rpm": "rpm", "revoluciones": "rpm",
+    "kg": "kg", "kilogramo": "kg", "kilogramos": "kg",
+    "mm": "mm", "milimetro": "mm", "milímetro": "mm", "milimetros": "mm", "milímetros": "mm",
+    "metro": "m", "metros": "m",
+    "segundo": "s", "segundos": "s",
+    "porciento": "%", "porcentaje": "%",
+}
+
+
+def unidades_mencionadas(texto: str) -> set[str]:
+    """Unidades canónicas que el texto NOMBRA, por símbolo o por palabra.
+
+    Existe por las tablas de catálogo: la columna se titula "Full Load Amps" y las
+    celdas traen solo "11.4", sin la A. Sin esto, el guard trata ese 11.4 como un
+    número sin unidad y se niega a respaldar una respuesta que diga "11,4 A" —
+    bloqueando una respuesta correcta, que en vivo es peor que no tener guard.
+    """
+    encontradas: set[str] = set()
+    for bruto in texto.split():
+        tok = _limpiar(bruto).lower()
+        if not tok:
+            continue
+        if tok in _INDICE and _INDICE[tok][0] != "ambigua":
+            encontradas.add(tok)
+        elif tok in _PALABRAS_DE_UNIDAD:
+            encontradas.add(_PALABRAS_DE_UNIDAD[tok])
+        else:
+            _, unidad = partir_unidad(tok)
+            if unidad:
+                encontradas.add(unidad)
+    return encontradas
+
+
 def coincide(
     a: Cantidad,
     b: Cantidad,

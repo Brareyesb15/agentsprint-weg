@@ -275,3 +275,36 @@ def test_el_resumen_corta_en_frontera_de_palabra():
 def test_el_resumen_de_una_incertidumbre_lo_dice():
     salida = ToolOutput(result=None, uncertainty="no hay nada en el corpus sobre 'precio'")
     assert salida.resumen().startswith("sin dato firme:")
+
+
+# --------------------------------------------------------------------------
+# 7. Decimales partidos por el PDF (verificado en el catálogo real de WEG)
+# --------------------------------------------------------------------------
+
+
+def test_repara_los_decimales_que_el_pdf_parte():
+    from agent.corpus import reparar_decimales
+
+    assert reparar_decimales("11. 4") == "11.4"
+    assert reparar_decimales("Full Load Amps 20. 5 a 4160V") == "Full Load Amps 20.5 a 4160V"
+    assert reparar_decimales("2. 60\n4. 00") == "2.60\n4.00"
+    assert reparar_decimales("tarifa 1.234, 56 pesos") == "tarifa 1.234,56 pesos"
+
+
+def test_no_toca_el_marcador_de_lista_al_inicio_de_renglon():
+    from agent.corpus import reparar_decimales
+
+    assert reparar_decimales("1. 4 pasos para instalar") == "1. 4 pasos para instalar"
+    assert reparar_decimales("2) 5 tornillos") == "2) 5 tornillos"
+
+
+def test_el_guard_confirma_un_valor_que_venia_partido():
+    """Sin la reparación, la evidencia tenía 11 y 4 sueltos y el guard BLOQUEABA
+    una respuesta correcta que dijera 11,4 A."""
+    from agent.corpus import reparar_decimales
+    from agent.sources import Source
+
+    crudo = "Full Load Amps 4160V\n11. 4"
+    fuente = Source(doc="US100.pdf", section="Datos", page=8, snippet=reparar_decimales(crudo))
+    res = verificar("La corriente a plena carga es de 11,4 A.", [fuente])
+    assert res.ok is True, res.detail
