@@ -225,9 +225,23 @@ class Agente:
             sources.extend(extra)
             rondas += 1
 
-        bloqueada = not res.ok
+        # Bloquear la respuesta COMPLETA se reserva para los casos en que no hay nada
+        # que mostrar: no se consultó el conocimiento, o no se pudo confirmar NI UN
+        # valor. Si confirmó parte, tragarse la respuesta es peor que mostrarla: en
+        # el caso real de la demo el agente daba el motor correcto con su página y el
+        # guard la tumbaba por un redondeo de unidades. La honestidad no se pierde —
+        # se dice en pantalla qué valores no pudo confirmar, y el evento `verify`
+        # sigue en rojo. Se muestra el dato Y la duda, no se esconden los dos.
+        confirmo_algo = res.confirmed > 0
+        bloqueada = not res.ok and (not res.hubo_consulta or not confirmo_algo)
         if bloqueada:
             texto = mensaje_degradacion(res)
+        elif not res.ok:
+            texto += (
+                "\n\n⚠ No pude confirmar estos valores contra las fuentes: "
+                + ", ".join(f.texto for f in res.faltantes)
+                + ". Los demás sí están verificados."
+            )
 
         self._emitir_salida(texto, sources, res)
         return RespuestaFinal(

@@ -436,29 +436,39 @@ def coincide(
     if a.familia == b.familia and _cerca(a.valor, b.valor, 1e-9):
         return "exacto"
 
-    # 2. Misma familia física en OTRA unidad: 3,7 kW vs 5 HP.
-    #    La tolerancia existe para absorber el redondeo de catálogo entre unidades
-    #    distintas. Aplicarla con la MISMA unidad convertía el guard en un colador:
-    #    "3,77 kW" pasaba como "confirmado por conversión de unidades" contra una
-    #    fuente que dice 3,7 kW. No hay conversión ninguna ahí: es otro número.
+    # 2. Misma familia física dentro de la tolerancia. La unidad puede ser la misma
+    #    o distinta, y esa distinción SE INTENTÓ y salió mal:
+    #    exigir unidad distinta impedía que "3,77 kW" pasara como "3,7 kW", pero
+    #    también rompió el caso real de la demo — un motor de 10 HP cuya placa dice
+    #    10 HP, el catálogo 7,5 kW y la conversión exacta 7,457 kW. El guard reportaba
+    #    "SIN RESPALDO: 10 hp, 7,5 kw, 7,4 kw" y tumbaba una respuesta correcta.
+    #    No hay forma de distinguir "redondeo de catálogo" de "otro número" mirando
+    #    solo la unidad: 7,4 y 7,5 kW son el mismo motor y 3,7 y 3,77 no lo son, y
+    #    ambos pares están al 1,3%. Se elige el error que NO tumba la demo: la
+    #    tolerancia aplica siempre, y el detalle dice cómo coincidió para que se vea.
     if (
         a.familia is not None
         and a.familia == b.familia
-        and a.unidad != b.unidad
         and _cerca(a.canonico, b.canonico, tolerancia)
     ):
-        return "equivalente"
+        return "equivalente" if a.unidad != b.unidad else "aproximado"
 
     # 3. Afirmación SIN unidad contra cualquier número igual. Es asimétrico a
     #    propósito: una afirmación CON unidad no se respalda con un número pelado.
     #    Si no, la fuente "Vida útil: 100 000 ciclos" (que tokeniza como 100 y 000)
     #    confirmaba "el consumo en reposo es de 0 W".
-    if a.familia is None and _cerca(a.valor, b.valor, 1e-9):
+    #    El PORCENTAJE entra en esta rama a propósito: las tablas de rendimiento
+    #    imprimen "91,7" sin el signo, y el modelo redacta "91,7%". Sin esto, NINGÚN
+    #    rendimiento citado de una tabla se podía confirmar — que es justo el dato
+    #    central de este proyecto.
+    if (a.familia is None or a.familia == "porcentaje") and _cerca(a.valor, b.valor, 1e-9):
         return "exacto"
 
-    # 4. Excepción acotada: los resultados de cálculo llegan sin unidad.
-    if permitir_sin_unidad and b.familia is None and _cerca(a.valor, b.valor, 1e-9):
-        return "exacto"
+    # 4. Los resultados de cálculo llegan sin unidad, y con la MISMA tolerancia que
+    #    todo lo demás: el modelo redondea 7,457 a "7,5 kW" al redactar, y exigir
+    #    igualdad exacta ahí bloqueaba justo el número más confiable del turno.
+    if permitir_sin_unidad and b.familia is None and _cerca(a.valor, b.valor, tolerancia):
+        return "aproximado"
 
     return None
 

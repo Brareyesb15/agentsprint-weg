@@ -259,6 +259,15 @@ def _redactar_detalle(
         detalle = "; ".join(f"{c[0].texto} (por conversión de unidades)" for c in equivalentes)
         partes.append(f"coincidencias por equivalencia: {detalle}")
 
+    # Las coincidencias por TOLERANCIA se declaran aparte y a propósito: no son
+    # exactas. "7,4 kW" respaldado por "7,5 kW" es el mismo motor redondeado, pero
+    # venderlo como confirmación exacta sería justo la clase de imprecisión que este
+    # guard existe para impedir. Se dice, y el jurado lo ve.
+    aproximados = [c for c in confirmadas if c[2] == "aproximado"]
+    if aproximados:
+        detalle = "; ".join(c[0].texto for c in aproximados)
+        partes.append(f"coincidencias por tolerancia, no exactas: {detalle}")
+
     if faltantes:
         partes.append(
             "SIN RESPALDO: " + ", ".join(f.texto for f in faltantes)

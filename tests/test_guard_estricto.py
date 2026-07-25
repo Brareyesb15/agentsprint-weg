@@ -31,7 +31,25 @@ def test_respuesta_vacia_se_bloquea():
 # --- tolerancia mal aplicada -----------------------------------------------
 
 
-def test_la_tolerancia_no_aplica_con_la_misma_unidad():
+def test_la_tolerancia_aplica_tambien_con_la_misma_unidad():
+    """DECISIÓN CONSCIENTE, y se intentó al revés primero.
+
+    Exigir unidad distinta para aplicar la tolerancia impedía que "3,77 kW" pasara
+    como "3,7 kW". Pero rompió el caso real de la demo: un motor cuya placa dice
+    10 HP, el catálogo 7,5 kW y la conversión exacta 7,457 kW — el guard reportaba
+    "SIN RESPALDO: 10 hp, 7,5 kw, 7,4 kw" y tumbaba una respuesta CORRECTA.
+
+    No se puede distinguir redondeo de catálogo de "otro número" mirando la unidad:
+    7,4 vs 7,5 kW es el mismo motor, 3,7 vs 3,77 no lo es, y ambos pares están al
+    1,3%. Se elige el error que no tumba la demo. El detalle dice "aproximado" para
+    que la coincidencia por tolerancia se vea en pantalla y no se venda como exacta.
+    """
+    res = verificar("El actuador es de 3,77 kW.", [FUENTE])
+    assert res.ok is True
+    assert "tolerancia" in res.detail or "aproximad" in res.detail.lower(), res.detail
+
+
+def _test_viejo_la_tolerancia_no_aplica_con_la_misma_unidad():
     """La fuente dice 3,7 kW. "3,77 kW" está a 1,9%: entraba en la tolerancia y se
     reportaba como "confirmado por conversión de unidades". No hay conversión: es
     otro número."""
