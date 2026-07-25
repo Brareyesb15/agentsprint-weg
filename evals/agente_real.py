@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from agent import config as cfg_mod
 from agent.corpus import Corpus
+from agent.dominio import registrar_dominio
 from agent.events import Emitter
 from agent.keys import Rotador
 from agent.llm import Cliente
@@ -27,12 +28,15 @@ def construir(emitter: Emitter | None = None) -> Agente:
             "va a bloquear todas las respuestas — y tendrá razón."
         )
     em = emitter or Emitter()
+    memoria = SessionMemory(em)
+    registro = registrar_dominio(construir_registro(corpus), corpus, memoria)
     return Agente(
         cliente=Cliente(Rotador(cfg.api_keys), cfg.cadena_de_modelos),
-        registro=construir_registro(corpus),
+        registro=registro,
         emitter=em,
-        memoria=SessionMemory(em),
+        memoria=memoria,
         tolerancia=cfg.guard_tolerancia,
+        lado_maximo_imagen=cfg.image_max_side,
     )
 
 

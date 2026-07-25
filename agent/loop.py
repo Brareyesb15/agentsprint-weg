@@ -125,7 +125,7 @@ class Agente:
             historial = [llm.texto_usuario(mensaje)]
 
         hechos = self.memoria.para_prompt()
-        sistema = prompts.SISTEMA
+        sistema = prompts.SISTEMA + prompts.FLUJO_MOTORES
         if len(self.memoria):
             sistema += f"\n\nHechos ya establecidos en esta sesión:\n{hechos}\n"
 
