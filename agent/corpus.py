@@ -75,7 +75,25 @@ def reparar_decimales(texto: str) -> str:
     return "\n".join(salida)
 
 
-def _titulo_de_pagina(texto: str, maximo: int = 70) -> str:
+def _lineas_repetidas(paginas: list[str], umbral: float = 0.4) -> set[str]:
+    """Líneas que salen en casi todas las páginas: son el encabezado corriente.
+
+    En el catálogo W22, "Motor Eléctrico Trifásico - W22" está en las 72 páginas.
+    Si esa es la `section`, las 72 citas se ven idénticas en pantalla y la búsqueda
+    no puede distinguir la tabla de IE3 a 60 Hz de la de IE2 a 50 Hz. El título útil
+    ("W22 - IE3 Premium Efficiency - 60 Hz") está dos renglones más abajo.
+    """
+    if len(paginas) < 4:
+        return set()
+    conteo: dict[str, int] = {}
+    for t in paginas:
+        for l in {x.strip() for x in t.splitlines()[:6] if x.strip()}:
+            conteo[l] = conteo.get(l, 0) + 1
+    minimo = max(2, int(len(paginas) * umbral))
+    return {l for l, n in conteo.items() if n >= minimo}
+
+
+def _titulo_de_pagina(texto: str, maximo: int = 70, ignorar: set[str] | None = None) -> str:
     """Heurística de encabezado: la primera línea corta y con letras de la página.
 
     Sirve para que la cita diga "hoja de datos X, Datos técnicos, pág. 2" en vez de
@@ -89,6 +107,8 @@ def _titulo_de_pagina(texto: str, maximo: int = 70) -> str:
         # El encabezado de cada página del catálogo de WEG es "www.weg.net". Citar
         # "pág. 36, www.weg.net" se ve descuidado en pantalla y no dice nada.
         if l.lower().startswith(("www.", "http")) or l.lower().endswith(".net"):
+            continue
+        if ignorar and l in ignorar:
             continue
         return l
     return ""
@@ -122,6 +142,11 @@ class Corpus:
         self._tokens = [
             set(tokenizar(f"{f.doc} {f.section} {f.texto}")) for f in fragmentos
         ]
+        # El título de la página pesa aparte: en un catálogo, "W22 - IE3 Premium
+        # Efficiency - 60 Hz" dice de qué tabla es esa página. Sin este peso, una
+        # página de IE2 a 50 Hz empata con la de IE3 a 60 Hz porque el cuerpo de
+        # ambas tiene los mismos números y las mismas palabras.
+        self._tokens_titulo = [set(tokenizar(f.section)) for f in fragmentos]
 
     # -- construcción ------------------------------------------------------
 
@@ -178,15 +203,18 @@ class Corpus:
         sin_texto = 0
         try:
             with fitz.open(archivo) as doc:
-                for n, pagina in enumerate(doc, start=1):
-                    texto = reparar_decimales((pagina.get_text() or "").strip())
+                paginas = [
+                    reparar_decimales((p.get_text() or "").strip()) for p in doc
+                ]
+                repetidas = _lineas_repetidas(paginas)
+                for n, texto in enumerate(paginas, start=1):
                     if len(texto) < 20:
                         sin_texto += 1
                         continue
                     fragmentos.append(
                         Fragmento(
                             doc=archivo.name,
-                            section=_titulo_de_pagina(texto),
+                            section=_titulo_de_pagina(texto, ignorar=repetidas),
                             page=n,
                             texto=texto,
                         )
@@ -239,12 +267,16 @@ class Corpus:
         if not terminos:
             return []
         puntuados: list[tuple[Fragmento, float]] = []
-        for frag, tokens in zip(self.fragmentos, self._tokens):
+        for frag, tokens, titulo in zip(
+            self.fragmentos, self._tokens, self._tokens_titulo
+        ):
             comunes = terminos & tokens
             if not comunes:
                 continue
-            puntuados.append((frag, len(comunes) / len(terminos)))
-        puntuados.sort(key=lambda p: p[1], reverse=True)
+            base = len(comunes) / len(terminos)
+            bonus = 0.6 * len(terminos & titulo) / len(terminos)
+            puntuados.append((frag, base + bonus))
+        puntuados.sort(key=lambda p: (-p[1], p[0].page or 0))
         return puntuados[:k]
 
     def leer(self, doc: str, section: str | None = None) -> list[Fragmento]:
