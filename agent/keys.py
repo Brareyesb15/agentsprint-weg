@@ -18,8 +18,15 @@ from typing import Callable, TypeVar
 
 T = TypeVar("T")
 
-# Señales de agotamiento de cuota en el mensaje de error del SDK.
-_SENALES_CUOTA = ("429", "resource_exhausted", "quota", "rate limit", "too many requests")
+# Señales que ameritan rotar de key y reintentar, en el mensaje de error del SDK.
+# No son solo cuota: el SDK a veces reporta un fallo transitorio de red como
+# "Cannot send a request, as the client has been closed" (visto en vivo con las
+# tres keys sanas y el REST respondiendo 200). Matar el turno por eso en plena
+# demo es absurdo; reintentar con otra key lo cura.
+_SENALES_CUOTA = (
+    "429", "resource_exhausted", "quota", "rate limit", "too many requests",
+    "client has been closed", "503", "unavailable", "timeout", "connection",
+)
 
 
 def es_error_de_cuota(e: BaseException) -> bool:

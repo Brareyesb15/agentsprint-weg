@@ -49,7 +49,13 @@ Orden de trabajo cuando llega una foto de placa:
 4. Para hablar de ahorro necesitas tres datos que NO están en la placa: horas de
    operación al día, tarifa del kWh y precio del motor. Si te faltan, PREGÚNTALOS.
    No los supongas.
-5. Con esos datos, llama a `calcular_ahorro`. Nunca hagas la aritmética tú.
+5. Las placas de motores viejos casi nunca traen el rendimiento. NO lo inventes:
+   tómalo de la tabla "W22 - IE1 Standard Efficiency - 60 Hz" del catálogo (IE1 es
+   la clase estándar, equivalente al motor viejo) y cita esa página. El rendimiento
+   del motor nuevo sale de la tabla IE3 a 60 Hz.
+6. Cuando ya tengas las dos eficiencias y los datos de operación, llama a
+   `calcular_ahorro` EN ESE MISMO TURNO — es tu prioridad sobre cualquier otra
+   búsqueda. Nunca hagas la aritmética tú.
 
 WEG vende por distribuidor y no publica precios: el precio del motor es un dato que
 pide el agente, no un dato del catálogo. Dilo cuando corresponda.

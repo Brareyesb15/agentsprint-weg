@@ -95,12 +95,19 @@ UNIDADES_CONOCIDAS = sorted(_INDICE.keys(), key=len, reverse=True)
 # CUALQUIER cifra que siguiera a un voltaje, que en una hoja de datos eléctrica es
 # media ficha. Una abreviatura ambigua no vale perder verificaciones.
 CONTEXTO_IGNORAR = {
-    "página", "pagina", "pág", "pag", "pp",
-    "page", "sección", "seccion", "sec", "section",
-    "tabla", "table", "figura", "fig", "capítulo", "capitulo",
-    "paso", "item", "ítem", "punto", "nota", "versión", "version",
+    "página", "pagina", "páginas", "paginas", "pág", "pag", "págs", "pags", "pp",
+    "page", "pages", "sección", "seccion", "secciones", "sec", "section",
+    "tabla", "table", "tablas", "figura", "fig", "capítulo", "capitulo",
+    "paso", "pasos", "item", "ítem", "punto", "nota", "versión", "version",
     "anexo", "apartado", "línea", "linea",
 }
+
+# Conectores que CONTINÚAN una enumeración de referencias: "páginas 50 y 51",
+# "tablas 3, 4 y 5". Sin esto, el primer número se ignoraba y el segundo no —
+# y el segundo, al no estar en la fuente, BLOQUEABA la respuesta completa.
+# Verificado en vivo: el agente citaba "páginas 50 y 51" y el guard reportaba
+# "no puedo confirmar 51", tumbando una respuesta correcta.
+_CONECTORES_ENUMERACION = {"y", "e", "o", "and", "a", "-", "–", "hasta", "al"}
 
 # Marcador de lista numerada al inicio de renglón: "1." o "2)".
 _RE_MARCADOR_LISTA = re.compile(r"^\d{1,3}[.)]$")
@@ -233,6 +240,10 @@ def _limpiar(token: str) -> str:
     return token.strip(_BASURA)
 
 
+def _es_numero(tok: str) -> bool:
+    return bool(_RE_NUMERO.match(tok))
+
+
 def _inicio_util(tokens: list[str]) -> int:
     """Índice del primer token que puede ser una afirmación, saltando el marcador.
 
@@ -272,16 +283,23 @@ def _cantidades_de_linea(linea: str) -> list[Cantidad]:
     tokens = linea.split()
     inicio = _inicio_util(tokens)
 
+    # Mientras sea True, los números son referencias al documento, no afirmaciones.
+    # Se enciende con "página"/"tabla"/… y se apaga al salir de la enumeración.
+    en_referencia = False
+
     for i in range(inicio, len(tokens)):
         tok = _limpiar(tokens[i])
         if not tok:
             continue
 
-        # ¿el token anterior dice que esto es una referencia al documento?
-        if i > inicio:
-            previo = _limpiar(tokens[i - 1]).lower().rstrip(".")
-            if previo in CONTEXTO_IGNORAR:
-                continue
+        previo = _limpiar(tokens[i - 1]).lower().rstrip(".") if i > inicio else ""
+        if previo in CONTEXTO_IGNORAR:
+            en_referencia = True
+        elif previo and previo not in _CONECTORES_ENUMERACION and not _es_numero(previo):
+            en_referencia = False
+
+        if en_referencia:
+            continue
 
         cabeza, unidad = partir_unidad(tok)
 

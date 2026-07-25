@@ -33,11 +33,11 @@ from agent.memory import SessionMemory
 from agent.sources import Source
 from agent.tools import Registro
 
-# Dos rondas, no cuatro. Cada ronda es una llamada al modelo: con cuatro, un turno
-# tardó 61 s medidos contra el catálogo real, y una demo en vivo son 180 s en total.
-# Con dos, el agente busca, lee lo que necesita y cierra. Si de verdad necesita más
-# contexto, el reintento del guard le da otra oportunidad.
-MAX_RONDAS = 2
+# Tres rondas. El número no es gusto: es el turno del ROI medido en vivo, que
+# necesita (1) eficiencia del motor nuevo en la tabla IE3, (2) eficiencia del viejo
+# en la tabla IE1, (3) calcular_ahorro. Con 2 rondas el agente se quedaba sin turnos
+# ANTES de llamar al cálculo y degradaba. Con 4 eran 61 s de demo; con 3 cabe justo.
+MAX_RONDAS = 3
 TOKENS_POR_EVENTO = 6
 
 
@@ -184,7 +184,7 @@ class Agente:
 
         # ----------------------------------------------------- FASE CIERRE
         historial.append(llm.texto_usuario(prompts.CIERRE))
-        final = self.cliente.generar(historial, sistema=sistema)
+        final = self._cerrar(historial, sistema, declaraciones)
         texto = final.texto
 
         res = verificar(
@@ -216,6 +216,38 @@ class Agente:
         )
 
     # -------------------------------------------------------------- internos
+
+    def _cerrar(self, historial, sistema, declaraciones):
+        """La llamada que redacta la respuesta final.
+
+        Manda las declaraciones de herramientas CON el modo NONE, y eso no es
+        contradictorio: es obligatorio. En este punto el historial ya contiene
+        `function_call` y `function_response`, y Gemini exige que las herramientas
+        estén declaradas cuando la conversación las contiene. Si se omiten, la API
+        **no da error**: devuelve texto vacío. Verificado en vivo — el turno con foto
+        de placa llegaba hasta buscar el motor y luego el guard reportaba
+        "el modelo no produjo una respuesta con contenido", dos veces.
+
+        El modo NONE es lo que garantiza que redacte en vez de pedir otra herramienta.
+        """
+        if not declaraciones:
+            resp = self.cliente.generar(historial, sistema=sistema)
+        else:
+            resp = self.cliente.generar(
+                historial,
+                sistema=sistema,
+                declaraciones=declaraciones,
+                modo=llm.MODO_SIN_TOOLS,
+            )
+        if not resp.texto:
+            # Se emite el diagnóstico, no solo el síntoma: sin esto el panel decía
+            # "no produjo respuesta" y no había forma de saber si fue MAX_TOKENS,
+            # SAFETY o que el modelo solo devolvió partes de pensamiento.
+            self.emitter.thought(
+                f"cierre vacío · finish_reason={resp.finish_reason or '?'} "
+                f"· partes={resp.partes} · {resp.tokens}"
+            )
+        return resp
 
     def _ejecutar(self, llamada: llm.LlamadaHerramienta):
         id_ = uuid.uuid4().hex[:8]
@@ -275,7 +307,7 @@ class Agente:
                     )
 
         historial.append(llm.texto_usuario(prompts.CIERRE))
-        segundo = self.cliente.generar(historial, sistema=sistema)
+        segundo = self._cerrar(historial, sistema, declaraciones)
 
         res2 = verificar(
             segundo.texto,

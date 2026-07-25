@@ -42,6 +42,9 @@ class Respuesta:
     texto: str = ""
     llamadas: list[LlamadaHerramienta] = field(default_factory=list)
     crudo: Any = None
+    finish_reason: str = ""
+    partes: int = 0
+    tokens: str = ""
     contenido: Any = None
     """El `Content` TAL CUAL lo devolvió el modelo.
 
@@ -98,7 +101,7 @@ class Cliente:
         sistema: str | None = None,
         declaraciones: list[dict[str, Any]] | None = None,
         modo: str = MODO_LIBRE,
-        temperatura: float = 0.0,
+        temperatura: float | None = None,
         modelo: str | None = None,
     ) -> Respuesta:
         config = self._config(sistema, declaraciones, modo, temperatura)
@@ -148,9 +151,17 @@ class Cliente:
         sistema: str | None,
         declaraciones: list[dict[str, Any]] | None,
         modo: str,
-        temperatura: float,
+        temperatura: float | None,
     ) -> types.GenerateContentConfig:
-        kwargs: dict[str, Any] = {"temperature": temperatura}
+        # La temperatura NO se manda salvo que alguien la pida explícita. Íbamos con
+        # 0.0 "para determinismo" y la guía de Gemini 3 advierte exactamente contra
+        # eso: en los modelos con razonamiento, bajarla produce respuestas VACÍAS y
+        # loops. Coincide con lo observado en vivo: el cierre del turno de ROI volvía
+        # sin contenido dos veces seguidas. El determinismo del proyecto no viene de
+        # la temperatura: viene de que las cuentas las hace Python.
+        kwargs: dict[str, Any] = {}
+        if temperatura is not None:
+            kwargs["temperature"] = temperatura
         if sistema:
             kwargs["system_instruction"] = sistema
         if declaraciones:
@@ -240,9 +251,31 @@ def _parsear(bruto: Any) -> Respuesta:
             if t:
                 textos.append(t)
 
+    # `finish_reason` y el conteo de tokens son la única forma de saber POR QUÉ una
+    # respuesta vino vacía: MAX_TOKENS (se gastó el presupuesto pensando), SAFETY,
+    # RECITATION o simplemente ninguna parte de texto. Sin esto solo se ve el
+    # síntoma y se depura a ciegas.
+    razon = ""
+    partes_vistas = 0
+    if candidatos:
+        fr = getattr(candidatos[0], "finish_reason", None)
+        razon = getattr(fr, "name", None) or str(fr or "")
+        contenido0 = getattr(candidatos[0], "content", None)
+        partes_vistas = len(getattr(contenido0, "parts", None) or [])
+    uso = getattr(bruto, "usage_metadata", None)
+
     return Respuesta(
         texto="".join(textos).strip(),
         llamadas=llamadas,
         crudo=bruto,
         contenido=contenido_original,
+        finish_reason=razon,
+        partes=partes_vistas,
+        tokens=(
+            f"in={getattr(uso, 'prompt_token_count', '?')} "
+            f"out={getattr(uso, 'candidates_token_count', '?')} "
+            f"think={getattr(uso, 'thoughts_token_count', '?')}"
+            if uso
+            else ""
+        ),
     )
