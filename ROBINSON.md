@@ -2,6 +2,26 @@
 
 Léelo completo antes de escribir código. Son 4 minutos y te ahorra media hora.
 
+## Lo primero, sin excepción: git
+
+```bash
+git pull
+```
+
+Córrelo **ahora**, y otra vez **antes de cada `git push`**. Nada más. No hay ritual.
+
+- Trabajas en `api/` y `ui/`; Brandon en `agent/`. Son archivos distintos, así que
+  git resuelve solo casi todo. Si aparece un conflicto en un archivo que no es tuyo,
+  **no lo resuelvas**: avísale a su dueño.
+- **Construye contra `team/CONTRATOS.md`, no contra el código de Brandon.** Ese
+  documento está congelado: si no se mueve, tu panel encaja aunque no pullees en una
+  hora. Es la razón por la que puedes trabajar en paralelo sin preguntar nada.
+- **Si el contrato cambia, Brandon te lo dice en voz alta.** No confíes en que lo vas
+  a leer a tiempo, y no supongas que un `git pull` te va a avisar: puede pasar
+  desapercibido en medio de veinte archivos.
+- Commitea en cuanto algo funcione. No acumules una hora de trabajo sin subir: si se
+  cae tu máquina, se cae la parte visual del proyecto entero.
+
 ## Qué construyes, en una frase
 
 Una pantalla donde el vendedor sube la **foto de una placa de motor**, escribe su
