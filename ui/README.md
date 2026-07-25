@@ -41,3 +41,9 @@ Bonus: *"full traceability"* es lenguaje del propio producto de los jueces.
 - `verify.checked` y `verify.confirmed` son **enteros**, para que puedas pintar "4/4".
   El orden en que llegan los eventos es a propósito: `verify` → `citation` → `token`,
   para que se vea que se verificó **antes** de que apareciera la respuesta.
+
+---
+
+**Antes de escribir código, lee [`../ROBINSON.md`](../ROBINSON.md)**: ahí está la
+decisión de tecnología ya tomada, el lector de streaming correcto y las cinco
+trampas verificadas del contrato.

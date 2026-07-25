@@ -47,3 +47,8 @@ Los cuatro endpoints de `team/CONTRATOS.md` § 4:
    verificarla completa antes de que se vea. Los eventos `token` son la respuesta ya
    verificada, troceada. No esperes tokens durante la fase de consulta: ahí lo que
    llega es `thought`, `tool_call` y `tool_result`.
+
+---
+
+**Antes de escribir código, lee [`../ROBINSON.md`](../ROBINSON.md)**: trae el orden
+de trabajo con reloj y cómo montar `ui/` como estático para eliminar el CORS.
