@@ -29,6 +29,7 @@ from agent import images as imagenes
 from agent import llm, prompts
 from agent.events import Emitter
 from agent.guardrails import VerifyResult, mensaje_degradacion, verificar  # noqa: F401
+from agent.conversacion import Conversacion
 from agent.memory import SessionMemory
 from agent.sources import Source
 from agent.tools import Registro
@@ -59,6 +60,7 @@ class Agente:
         registro: Registro,
         emitter: Emitter,
         memoria: SessionMemory | None = None,
+        conversacion: Conversacion | None = None,
         *,
         tolerancia: float = 0.02,
         max_rondas: int = MAX_RONDAS,
@@ -74,6 +76,10 @@ class Agente:
         # MEMORIA se llena en pantalla y el agente nunca ve el hecho. Parece
         # funcionar, que es peor que fallar.
         self.memoria = memoria if memoria is not None else SessionMemory(emitter)
+        # Misma trampa que arriba: `Conversacion` define __len__, así que una
+        # conversación vacía es falsy. `is not None` o el servidor pierde el
+        # historial justo en el primer turno, que es cuando se crea.
+        self.conversacion = conversacion if conversacion is not None else Conversacion()
         self.tolerancia = tolerancia
         self.max_rondas = max_rondas
         self.lado_maximo_imagen = lado_maximo_imagen
@@ -126,12 +132,22 @@ class Agente:
             original = len(imagen)
             imagen, mime = imagenes.reescalar(imagen, self.lado_maximo_imagen)
             self.emitter.thought(imagenes.ahorro(original, len(imagen)))
-            historial: list[Any] = [llm.usuario_con_imagen(mensaje, imagen, mime)]
+            turno_actual: Any = llm.usuario_con_imagen(mensaje, imagen, mime)
         else:
-            historial = [llm.texto_usuario(mensaje)]
+            turno_actual = llm.texto_usuario(mensaje)
+
+        # Lo hablado antes va DELANTE del turno actual. Sin esto el agente arrancaba
+        # en blanco cada vez y el guion de levantamiento no podía pasar del paso 2:
+        # preguntaba el voltaje sin acordarse de los HP que ya le habían dado.
+        historial: list[Any] = [
+            llm.texto_usuario(t.texto) if t.rol == "usuario" else llm.texto_modelo(t.texto)
+            for t in self.conversacion
+        ]
+        historial.append(turno_actual)
+        self.conversacion.agregar("usuario", mensaje)
 
         hechos = self.memoria.para_prompt()
-        sistema = prompts.SISTEMA + prompts.FLUJO_MOTORES
+        sistema = prompts.SISTEMA + prompts.FLUJO_MOTORES + prompts.GUION_COTIZACION
         if len(self.memoria):
             sistema += f"\n\nHechos ya establecidos en esta sesión:\n{hechos}\n"
 
@@ -243,6 +259,11 @@ class Agente:
                 + ". Los demás sí están verificados."
             )
 
+        # Se guarda el texto QUE SE MOSTRÓ, no el que el modelo redactó: si el guard
+        # lo bloqueó, lo que el usuario leyó fue el mensaje de degradación, y el
+        # agente tiene que recordar eso mismo. Guardar la versión bloqueada lo dejaría
+        # creyendo que ya dio un dato que en pantalla nunca apareció.
+        self.conversacion.agregar("agente", texto)
         self._emitir_salida(texto, sources, res)
         return RespuestaFinal(
             texto=texto, sources=_unicas(sources), verify=res,

@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from agent import config as cfg_mod
+from agent.conversacion import Conversacion
 from agent.corpus import Corpus
 from agent.dominio import registrar_dominio
 from agent.events import Emitter
@@ -46,6 +47,7 @@ _cfg = None
 _corpus: Corpus | None = None
 _cliente: Cliente | None = None
 _memorias: dict[str, SessionMemory] = {}
+_conversaciones: dict[str, Conversacion] = {}
 _lock = threading.Lock()
 
 
@@ -108,12 +110,19 @@ async def chat(req: ChatIn) -> StreamingResponse:
             em = Emitter(sink=cola.put)
             memoria = _memorias.setdefault(req.session_id, SessionMemory(em))
             memoria._emitter = em  # el emitter cambia por request, la memoria no
-            registro = registrar_dominio(construir_registro(corpus), corpus, memoria)
+            # El historial es por sesión, igual que la memoria: si se creara acá por
+            # request, el agente volvería a arrancar en blanco en cada mensaje y el
+            # guion de levantamiento no pasaría del paso 2.
+            conversacion = _conversaciones.setdefault(req.session_id, Conversacion())
+            registro = registrar_dominio(
+                construir_registro(corpus), corpus, memoria, conversacion
+            )
             agente = Agente(
                 cliente=cliente,
                 registro=registro,
                 emitter=em,
                 memoria=memoria,
+                conversacion=conversacion,
                 tolerancia=cfg.guard_tolerancia,
                 lado_maximo_imagen=cfg.image_max_side,
             )

@@ -103,7 +103,14 @@ def verificar(
     afirmaciones = extraer_cantidades(respuesta)
 
     # --- Puerta 1: ¿se consultó el conocimiento? ---------------------------
-    if exigir_consulta and not hubo_consulta:
+    # Solo aplica si el turno AFIRMA algo. La regla del proyecto es "ninguna
+    # afirmación sobre un producto sin cita", y una pregunta no afirma nada: durante
+    # el levantamiento de requisitos el agente pregunta voltaje, montaje o polos sin
+    # tocar el catálogo, y con esta puerta disparando siempre esas preguntas salían
+    # reemplazadas por "no alcancé a consultar la documentación" — el guion completo
+    # convertido en una negativa. Se exige consulta cuando hay cifras o referencias
+    # de producto que sostener, que es exactamente cuando puede haber invención.
+    if exigir_consulta and not hubo_consulta and (afirmaciones or extraer_codigos(respuesta)):
         return VerifyResult(
             ok=False,
             checked=len(afirmaciones),

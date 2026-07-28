@@ -146,9 +146,10 @@ def test_las_herramientas_quedan_registradas_y_son_deterministas():
     assert "registrar_placa" in reg.nombres()
     assert "calcular_ahorro" in reg.nombres()
     assert "buscar_motor_equivalente" in reg.nombres()
+    assert "iniciar_nueva_busqueda" in reg.nombres()
     deterministas, con_modelo = reg.cuentas()
     assert con_modelo == 0, "ninguna herramienta debe llamar al modelo"
-    assert deterministas == 5
+    assert deterministas == 6
 
 
 def test_registrar_placa_guarda_los_hechos_en_memoria():

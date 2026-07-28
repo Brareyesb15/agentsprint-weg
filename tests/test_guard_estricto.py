@@ -148,3 +148,44 @@ def test_los_datos_de_la_placa_se_confirman():
     )
     assert res.ok is True, res.detail
     assert res.confirmed == res.checked
+
+
+# --- turnos que no afirman nada ---------------------------------------------
+# La Puerta 1 exigía consulta en TODO turno. El guion de levantamiento son
+# preguntas ("¿a qué voltaje se conecta?") que no tocan el catálogo, y salían
+# todas reemplazadas por "no alcancé a consultar la documentación": el guion
+# entero convertido en una negativa. Ahora la puerta pide consulta cuando hay
+# algo que sostener. Lo que NO puede pasar es que se afloje para las cifras.
+
+
+def test_una_pregunta_sin_consultar_no_se_bloquea():
+    for pregunta in [
+        "Con gusto le ayudo. ¿El motor es para reemplazar uno averiado o para un proyecto nuevo?",
+        "¿Cómo va sujeto el motor a la máquina: sobre patas, con brida frontal, o ambas?",
+        "¿Para qué máquina es el motor? Con eso puedo deducir la velocidad.",
+    ]:
+        res = verificar(pregunta, [], hubo_consulta=False, exigir_consulta=True)
+        assert res.ok is True, f"bloqueó una pregunta: {res.detail}"
+
+
+def test_una_cifra_sin_consultar_SIGUE_bloqueada():
+    """El punto entero del guard. Si esto se rompe, se perdió el hito de grounding."""
+    res = verificar(
+        "El motor que necesita es de 10 HP con rendimiento de 92,0 %.",
+        [],
+        hubo_consulta=False,
+        exigir_consulta=True,
+    )
+    assert res.ok is False
+    assert "sin consultar el conocimiento" in res.detail
+
+
+def test_una_referencia_de_producto_sin_consultar_SIGUE_bloqueada():
+    """Sin cifras pero nombrando un producto: tampoco puede pasar de memoria."""
+    res = verificar(
+        "Le recomiendo el motor W22 IE3 con carcasa 132S para esa aplicación.",
+        [],
+        hubo_consulta=False,
+        exigir_consulta=True,
+    )
+    assert res.ok is False, res.detail

@@ -4,7 +4,7 @@ Reparto a propósito — es el dato del pitch:
 
     registrar_placa           NO usa el modelo (valida con física)
     calcular_ahorro           NO usa el modelo (aritmética)
-    buscar_motor_equivalente  NO usa el modelo (búsqueda + cita)
+    buscar_motor_equivalente  NO usa el modelo (parsea la tabla, filtra y cita la FILA)
     buscar_conocimiento       NO usa el modelo   } del registro base
     leer_documento            NO usa el modelo   }
 
@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from agent import motores
+from agent import motores, tablas
+from agent.conversacion import Conversacion
 from agent.corpus import Corpus
 from agent.memory import SessionMemory
 from agent.tools import Registro, Tool, ToolOutput
@@ -128,6 +129,16 @@ def _es_otra_frecuencia(seccion: str) -> bool:
 
 
 def _buscar_motor(a: BuscarMotorArgs, corpus: Corpus) -> ToolOutput:
+    # PRIMERO la tabla, y solo si no hay tabla se cae a la búsqueda léxica. El orden
+    # importa: la selección por filas recorre el catálogo ENTERO y decide con la
+    # frecuencia y la clase de cada fila, mientras que la léxica solo rankea páginas
+    # por parecido de texto. Cuando la léxica no encontraba nada devolvía "no hay
+    # nada en el catálogo" antes de que la tabla pudiera opinar — y la tabla sí sabía
+    # la respuesta.
+    filas = tablas.filas_del_corpus(corpus)
+    if filas and (a.potencia_hp or a.polos or a.frame):
+        return _elegir_fila(a, filas)
+
     # La frecuencia va SIEMPRE, aunque el modelo no la pida. El catálogo trae las
     # mismas potencias en tablas de 50 Hz y de 60 Hz, y sin este término la búsqueda
     # las mezcla: en la primera prueba con la placa real ofreció un IE3 de 50 Hz,
@@ -166,6 +177,8 @@ def _buscar_motor(a: BuscarMotorArgs, corpus: Corpus) -> ToolOutput:
             ),
         )
 
+    # Sin tabla parseable o sin criterios que comparar no hay nada que verificar:
+    # se cita a nivel de página, como antes, y se dice que la cita es de página.
     sources = [
         frag.como_source(corpus.lineas_relevantes(frag, consulta)) for frag, _ in golpes
     ]
@@ -175,6 +188,96 @@ def _buscar_motor(a: BuscarMotorArgs, corpus: Corpus) -> ToolOutput:
             for s in sources
         ],
         sources=sources,
+        uncertainty=(
+            "cita a nivel de PÁGINA, no de fila: no pude aislar el motor en la tabla. "
+            "Los valores de esta página pertenecen a muchos motores distintos, así que "
+            "no atribuyas a un motor cifras que no puedas ubicar en su propia fila."
+        ),
+    )
+
+
+def _elegir_fila(a: BuscarMotorArgs, filas: list[tablas.FilaMotor]) -> ToolOutput:
+    """Selecciona la fila que cumple los criterios y REPORTA si los cumple.
+
+    Devolver la fila y no la página es lo que le da sentido al check del guard: la
+    evidencia pasa de 1.712 números de la página a los ~20 del motor citado, así que
+    mezclar cifras de dos motores deja de validar.
+    """
+    # En dos pasos a propósito. Primero se acota el universo a las filas que de
+    # verdad pueden sostener la recomendación (la frecuencia del país y la clase
+    # pedida); recién sobre ese universo se busca la potencia. Así el "más cercano"
+    # del caso sin resultados sale de la tabla correcta y no de un IE1 de 50 Hz.
+    universo, exigido_base = tablas.seleccionar(
+        filas,
+        clase_eficiencia=a.clase_eficiencia,
+        frecuencia_hz=motores.FRECUENCIA_HZ,
+    )
+    candidatas, exigido_potencia = tablas.seleccionar(
+        universo, potencia_hp=a.potencia_hp, polos=a.polos, carcasa=a.frame
+    )
+    exigido = exigido_base + exigido_potencia
+
+    if candidatas:
+        elegidas = candidatas[:3]
+        return ToolOutput(
+            result={
+                "solicitado": exigido,
+                "cumple": True,
+                "motores": [f.como_dict() for f in elegidas],
+            },
+            sources=[f.como_source() for f in elegidas],
+        )
+
+    # Nada cumple. En vez de cerrar con un "no existe", se recorre el RESTO del
+    # catálogo soltando una restricción por vez: casi siempre la opción existe en
+    # otra clase de eficiencia o con otro número de polos. Se le muestran al usuario
+    # y se le PREGUNTA cuál puede ceder, que es como se llega a un valor acertado sin
+    # que el agente decida por él.
+    pedido = " + ".join(exigido) if exigido else "los criterios dados"
+    opciones = tablas.alternativas(
+        filas,
+        potencia_hp=a.potencia_hp,
+        polos=a.polos,
+        carcasa=a.frame,
+        clase_eficiencia=a.clase_eficiencia,
+        frecuencia_hz=motores.FRECUENCIA_HZ,
+    )
+
+    sources = [fila.como_source() for _, _, elegidas in opciones for fila in elegidas]
+    caminos = [
+        {
+            "si_cambias": criterio,
+            "a": variantes,
+            "motores": [f.como_dict() for f in elegidas],
+        }
+        for criterio, variantes, elegidas in opciones
+    ]
+
+    if not caminos:
+        return ToolOutput(
+            result={"solicitado": exigido, "cumple": False, "motores": [], "alternativas": []},
+            uncertainty=(
+                f"NINGÚN motor cumple {pedido}, y tampoco aparece nada soltando una "
+                "sola restricción: no está en el catálogo. Dilo, no ofrezcas un "
+                "sustituto como si cumpliera."
+            ),
+        )
+
+    resumen = "; ".join(f"cambiando {c} a {v}" for c, v, _ in opciones)
+    return ToolOutput(
+        result={
+            "solicitado": exigido,
+            "cumple": False,
+            "motores": [],
+            "alternativas": caminos,
+        },
+        sources=sources,
+        uncertainty=(
+            f"NINGÚN motor cumple {pedido}. En el resto del catálogo sí hay opciones "
+            f"si se mueve UNA restricción: {resumen}. Muéstrale esas alternativas al "
+            "usuario, di claramente en qué se apartan de lo que pidió, y PREGÚNTALE "
+            "cuál restricción puede ceder antes de recomendar ninguna. No elijas por él."
+        ),
     )
 
 
@@ -239,7 +342,55 @@ def _calcular_ahorro(a: AhorroArgs, memoria: SessionMemory) -> ToolOutput:
 # ---------------------------------------------------------------------------
 
 
-def registrar_dominio(reg: Registro, corpus: Corpus, memoria: SessionMemory) -> Registro:
+class NuevaBusquedaArgs(BaseModel):
+    confirmado: bool = Field(
+        description="True SOLO si el usuario ya confirmó que quiere empezar de cero. "
+        "Si no se lo has preguntado todavía, no llames a esta herramienta: pregúntale."
+    )
+    motivo: str = Field("", description="Qué dijo el usuario que indica que es otro motor")
+
+
+def _nueva_busqueda(
+    a: NuevaBusquedaArgs, memoria: SessionMemory, conversacion: Conversacion
+) -> ToolOutput:
+    """Borra los datos del motor anterior. El borrado lo hace Python, no el prompt.
+
+    Un "olvida lo anterior" metido en el prompt no borra nada: los hechos siguen
+    inyectados en el sistema y el agente los sigue viendo. Acá se vacían de verdad,
+    y como es una herramienta, el borrado sale en el panel de trazas en vez de ser
+    un cambio invisible de estado.
+    """
+    if not a.confirmado:
+        return ToolOutput(
+            result={"borrado": False},
+            uncertainty=(
+                "No borré nada: primero pregúntale al usuario si es una búsqueda NUEVA "
+                "o si seguimos con el motor que ya veníamos trabajando. Perder los "
+                "datos que ya dio sin confirmar es peor que preguntar de más."
+            ),
+        )
+
+    anteriores = memoria.como_dict()
+    for clave in list(anteriores):
+        memoria.olvidar(clave)
+    descartados = conversacion.reiniciar()
+
+    return ToolOutput(
+        result={
+            "borrado": True,
+            "hechos_descartados": sorted(anteriores),
+            "mensajes_descartados": descartados,
+            "motivo": a.motivo,
+        },
+    )
+
+
+def registrar_dominio(
+    reg: Registro,
+    corpus: Corpus,
+    memoria: SessionMemory,
+    conversacion: Conversacion | None = None,
+) -> Registro:
     """Agrega las herramientas de motores al registro base. Devuelve el mismo registro."""
 
     reg.registrar(
@@ -281,6 +432,22 @@ def registrar_dominio(reg: Registro, corpus: Corpus, memoria: SessionMemory) -> 
             ),
             args_model=AhorroArgs,
             fn=lambda a: _calcular_ahorro(a, memoria),
+            es_conocimiento=False,
+            usa_modelo=False,
+        )
+    )
+    conv = conversacion if conversacion is not None else Conversacion()
+    reg.registrar(
+        Tool(
+            nombre="iniciar_nueva_busqueda",
+            descripcion=(
+                "Descarta los datos del motor que se venía trabajando y empieza de "
+                "cero. Llámala cuando el usuario indique que ahora se trata de OTRO "
+                "motor y ya te haya CONFIRMADO que es una búsqueda nueva. Si no lo "
+                "confirmó, pregúntale primero: no borres datos por tu cuenta."
+            ),
+            args_model=NuevaBusquedaArgs,
+            fn=lambda a: _nueva_busqueda(a, memoria, conv),
             es_conocimiento=False,
             usa_modelo=False,
         )

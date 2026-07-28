@@ -19,6 +19,7 @@ from typing import Any, Callable
 
 from pydantic import BaseModel, Field, ValidationError
 
+from agent import tablas
 from agent.corpus import Corpus
 from agent.sources import Source
 
@@ -263,15 +264,45 @@ def construir_registro(corpus: Corpus) -> Registro:
                 result=[],
                 uncertainty=f"no hay nada en el corpus sobre '{a.consulta}'",
             )
-        sources = [
-            frag.como_source(corpus.lineas_relevantes(frag, a.consulta))
-            for frag, _ in golpes
-        ]
+
+        # Las páginas de tabla se separan de las de prosa. De una tabla NUNCA sale la
+        # página entera: sale, como mucho, un puñado de filas — y el tope se aplica
+        # sobre el total de las páginas, no sobre cada una.
+        sources: list[Source] = []
+        candidatas: list[tuple[int, Any]] = []
+        hubo_tabla = False
+        for frag, _ in golpes:
+            puntuadas = tablas.filas_puntuadas(
+                frag.texto, frag.doc, frag.section, frag.page, a.consulta
+            )
+            if puntuadas:
+                candidatas.extend(puntuadas)
+                hubo_tabla = True
+            elif tablas.parsear_filas(frag.texto, frag.doc, frag.section, frag.page):
+                hubo_tabla = True  # es tabla y la consulta no señala ninguna fila
+            else:
+                sources.append(frag.como_source(corpus.lineas_relevantes(frag, a.consulta)))
+
+        # Solo las filas que coinciden MEJOR, no todas las que coinciden en algo. Con
+        # "10 HP 4 polos", la fila de 25 HP puntúa por los polos y se colaba entera
+        # al pozo de evidencia: dos motores en la mesa vuelven a permitir mezclarlos.
+        if candidatas:
+            tope = max(p for p, _ in candidatas)
+            mejores = [f for p, f in candidatas if p == tope][: tablas.TOPE_FILAS]
+            sources.extend(fila.como_source() for fila in mejores)
+
+        incierto = tablas.AVISO_TABLA if hubo_tabla else None
+        if not sources:
+            return ToolOutput(
+                result=[],
+                uncertainty=incierto or f"no hay nada en el corpus sobre '{a.consulta}'",
+            )
         return ToolOutput(
             result=[
                 {"doc": s.doc, "section": s.section, "texto": s.snippet} for s in sources
             ],
             sources=sources,
+            uncertainty=incierto,
         )
 
     def leer(a: LeerArgs) -> ToolOutput:
@@ -287,6 +318,19 @@ def construir_registro(corpus: Corpus) -> Registro:
         # responder. Si hay más fragmentos, se dice cuáles quedaron fuera para que
         # el modelo pida la sección exacta.
         recorte = frags[:3]
+        # Una sección de tabla tampoco se vuelca entera acá: `leer_documento` era la
+        # otra puerta al pozo de números de la página. Sin consulta que apunte a una
+        # fila no hay forma de saber a qué motor pertenece cada cifra, así que se
+        # devuelve el aviso y se manda a `buscar_motor_equivalente`.
+        es_tabla = any(
+            tablas.parsear_filas(f.texto, f.doc, f.section, f.page) for f in recorte
+        )
+        if es_tabla:
+            return ToolOutput(
+                result=[{"section": f.section, "pagina": f.page} for f in recorte],
+                sources=[],
+                uncertainty=tablas.AVISO_TABLA,
+            )
         sources = [f.como_source() for f in recorte]
         incierto = None
         if len(frags) > len(recorte):
